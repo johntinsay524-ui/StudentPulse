@@ -1,13 +1,17 @@
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Public+Sans:wght@400;500;600;700&display=swap');
-/* Student Pulse palette: maroon and gold.
-   Dark mode = deep maroon-black with gold accents. Light mode = cream with maroon accents.
-   (--gold is the "accent" color: gold in dark mode, maroon in light mode.) */
-:root{--bg:#1A0F10;--sf:#241416;--rs:#2E1A1C;--bd:#4A2A2D;--tx:#F3E9DC;--mu:#C7B3A6;--fa:#A18C84;--gold:#E3B341;--gs:rgba(227,179,65,.14);--ongold:#2A1306;--grn:#7FB069;--red:#E26D5F;--maroon:#6B0F1A;--topgold:#F0C45A;
+/* Student Pulse palette: Thorn Crown (deep plum), Blood Bargain (wine), Fae Fruit (orange), Opal (violet).
+   Dark mode = deep plum with soft cream text and orange accents.
+   Light mode = cream with plum text and wine accents.
+   (--gold is the "accent" color: orange in dark mode, wine in light mode.)
+   Text colors are picked for strong contrast so they stay readable on a classroom projector. */
+:root{--bg:#2D1036;--sf:#3B1848;--rs:#4A2259;--bd:#6E4A7C;--tx:#F6EDE3;--mu:#D8C3D9;--fa:#C9AECF;--gold:#F2956F;--gs:rgba(242,149,111,.16);--ongold:#2D1036;--grn:#8FD18A;--red:#FF9A8E;--onred:#2D1036;--blue:#9DB8FF;
+--maroon:#6B0733;--topgold:#F2956F;--opal:#6850AD;--onopal:#fff;
+--m-happy:#3F9A55;--m-meh:#8A86A8;--m-stressed:#D9902B;--m-upset:#D4493D;
 --serif:'Fraunces',Georgia,'Palatino Linotype',serif;--sans:'Public Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;
 box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#FAF4E8;--sf:#FFFBF2;--rs:#F3E8D3;--bd:#DCC9AA;--tx:#2B1214;--mu:#6E4A4C;--fa:#75595B;--gold:#7A1020;--gs:rgba(122,16,32,.10);--ongold:#FFF4D6;--grn:#3F7A2E;--red:#B3261E}}
-:root[data-theme="light"]{--bg:#FAF4E8;--sf:#FFFBF2;--rs:#F3E8D3;--bd:#DCC9AA;--tx:#2B1214;--mu:#6E4A4C;--fa:#75595B;--gold:#7A1020;--gs:rgba(122,16,32,.10);--ongold:#FFF4D6;--grn:#3F7A2E;--red:#B3261E}
-:root[data-theme="dark"]{--bg:#1A0F10;--sf:#241416;--rs:#2E1A1C;--bd:#4A2A2D;--tx:#F3E9DC;--mu:#C7B3A6;--fa:#A18C84;--gold:#E3B341;--gs:rgba(227,179,65,.14);--ongold:#2A1306;--grn:#7FB069;--red:#E26D5F}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#FAF4E8;--sf:#FFFBF2;--rs:#F3E8D3;--bd:#CDB48E;--tx:#2D1036;--mu:#4F3558;--fa:#624868;--gold:#6B0733;--gs:rgba(107,7,51,.10);--ongold:#FFF4E6;--grn:#2F6B22;--red:#A8201A;--onred:#fff;--blue:#2F52B8}}
+:root[data-theme="light"]{--bg:#FAF4E8;--sf:#FFFBF2;--rs:#F3E8D3;--bd:#CDB48E;--tx:#2D1036;--mu:#4F3558;--fa:#624868;--gold:#6B0733;--gs:rgba(107,7,51,.10);--ongold:#FFF4E6;--grn:#2F6B22;--red:#A8201A;--onred:#fff;--blue:#2F52B8}
+:root[data-theme="dark"]{--bg:#2D1036;--sf:#3B1848;--rs:#4A2259;--bd:#6E4A7C;--tx:#F6EDE3;--mu:#D8C3D9;--fa:#C9AECF;--gold:#F2956F;--gs:rgba(242,149,111,.16);--ongold:#2D1036;--grn:#8FD18A;--red:#FF9A8E;--onred:#2D1036;--blue:#9DB8FF}
 *{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
 body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.55 var(--sans)}
 button,input,textarea,select{font:inherit;color:inherit}button{cursor:pointer}
@@ -56,12 +60,12 @@ body.mod .remove{display:inline}
 
 .storewarn{background:rgba(181,82,74,.15);color:var(--red);border-bottom:1px solid rgba(181,82,74,.4);padding:8px 16px;font-size:13px;text-align:center}
 
-/* maroon top bar with gold text (same in light and dark) */
+/* wine top bar with orange title and cream text (same in light and dark) */
 .top{background:var(--maroon);border-bottom:3px solid var(--topgold)}
 .top h1{color:var(--topgold)}
-.top span,.top a{color:#EBD9BF !important}
+.top span,.top a{color:#F6EDE3 !important}
 .top a#adminLink{color:var(--topgold) !important}
-.top button{color:#EBD9BF;border-color:rgba(240,196,90,.45)}
+.top button{color:#F6EDE3;border-color:rgba(242,149,111,.6)}
 .top button:hover,.top button.on{color:var(--topgold);border-color:var(--topgold)}
 
 /* photos */
@@ -124,7 +128,7 @@ body.mod .remove{display:inline}
 .cm .rpmenu{margin-top:4px}
 
 /* pop-up dialogs (dialog.js) */
-.uimodal{position:fixed;inset:0;z-index:100;background:rgba(10,4,5,.55);display:flex;align-items:center;justify-content:center;padding:max(20px,env(safe-area-inset-top,0px)) 20px max(20px,env(safe-area-inset-bottom,0px))}
+.uimodal{position:fixed;inset:0;z-index:100;background:rgba(15,4,20,.6);display:flex;align-items:center;justify-content:center;padding:max(20px,env(safe-area-inset-top,0px)) 20px max(20px,env(safe-area-inset-bottom,0px))}
 .uibox{width:100%;max-width:400px;padding:22px;border-top:4px solid var(--maroon);box-shadow:0 12px 40px rgba(0,0,0,.35)}
 .uibox h3{font:600 20px var(--serif);margin:0 0 8px;color:var(--tx)}
 .uibox p{margin:0 0 14px;color:var(--mu);overflow-wrap:anywhere}
@@ -140,11 +144,6 @@ body.mod .remove{display:inline}
 .cm-acts button[data-ca="rp"]{border:1px solid var(--bd);border-radius:20px;padding:1px 10px;color:var(--mu);font-size:12px}
 .cm-acts button[data-ca="rp"]:hover:not(:disabled){border-color:var(--red);color:var(--red)}
 
-/* ---- theme extras: accessible colors for text on red, vote-down blue, and mood chart colors ---- */
-:root{--blue:#6C8EEF;--onred:#1A0F10;--m-happy:#3F8A4A;--m-meh:#7D838C;--m-stressed:#B87A00;--m-upset:#C0392B}
-@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){--blue:#2F52B8;--onred:#fff}}
-:root[data-theme="light"]{--blue:#2F52B8;--onred:#fff}
-:root[data-theme="dark"]{--blue:#6C8EEF;--onred:#1A0F10}
 ::placeholder{color:var(--fa);opacity:1}
 
 /* ---- accessibility ---- */
@@ -201,3 +200,14 @@ body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 :is(.rb,.rolepill,.pill).r-staff{color:var(--grn);border-color:color-mix(in srgb,var(--grn) 55%,transparent)}
 :is(.rb,.rolepill,.pill).r-moderator{color:var(--gold);border-color:color-mix(in srgb,var(--gold) 55%,transparent)}
 .rolesel{background:var(--bg);border:1px solid var(--bd);border-radius:4px;padding:3px 6px;font-size:12.5px;color:var(--tx)}
+
+/* ---- projector readability: slightly larger small text, solid opal for selected items ---- */
+body{font-size:16px}
+.meta,.acts,.anonnote{font-size:13.5px}
+.cm{font-size:14.5px}.cm .n{font-size:13.5px}
+.cm-acts button,.cm-acts .edtag,.edtag{font-size:13px}
+.tag{font-size:12.5px}
+.rules,.bar{font-size:14px}
+.mood,.photo-btn,.anon,.rpmenu,.rpmenu button{font-size:13.5px}
+.boards button.on,.sort button.on,.mood.on,
+.tabs .tab-btn.on,.chartbox .rangebar button.on{background:var(--opal);color:var(--onopal);border-color:var(--opal);font-weight:600}
