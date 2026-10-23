@@ -26,12 +26,14 @@ create function must_mod() returns void language plpgsql stable as $$ begin if n
 create function my_name() returns text language sql stable security definer set search_path=public as $$ select username::text from profiles where id=auth.uid() $$;
 create function log_mod(t text) returns void language sql security definer set search_path=public as $$ insert into mod_log(who,text) values(my_name(),t) $$;
 
--- sign-up: every new account is a student; the username comes from the sign-up form
+-- sign-up: username from metadata; role is student/teacher/staff only (never moderator from public sign-up)
 create function handle_new_user() returns trigger language plpgsql security definer set search_path=public as $$
 declare n text := new.raw_user_meta_data->>'username';
+  r text := coalesce(new.raw_user_meta_data->>'role', 'student');
 begin
   if n is null or n !~ '^[A-Za-z0-9_]{3,20}$' or lower(n)='anonymous' then raise exception 'Username must be 3–20 letters, numbers or underscores.'; end if;
-  insert into profiles(id,username) values(new.id,n); insert into standing(user_id) values(new.id); return new;
+  if r not in ('student', 'teacher', 'staff') then r := 'student'; end if;
+  insert into profiles(id,username,role) values(new.id,n,r); insert into standing(user_id) values(new.id); return new;
 end $$;
 create trigger on_auth_user_created after insert on auth.users for each row execute function handle_new_user();
 create function username_free(n text) returns boolean language sql security definer set search_path=public as $$ select not exists(select 1 from profiles where username=n) and lower(n)<>'anonymous' $$;
@@ -73,6 +75,8 @@ create trigger t_profile before update on profiles for each row execute function
 alter table profiles enable row level security; alter table standing enable row level security; alter table history enable row level security;
 alter table posts enable row level security; alter table comments enable row level security; alter table votes enable row level security;
 alter table reports enable row level security; alter table mod_log enable row level security; alter table words enable row level security; alter table settings enable row level security;
+-- Students need to read their own open reports (powers the my_reported view / "Reported ✓" on the board)
+create policy "own reports" on reports for select to authenticated using(auth.uid() = any(reporters));
 create policy "see profiles" on profiles for select to authenticated using(true);
 create policy "edit own profile" on profiles for update to authenticated using(id=auth.uid()) with check(id=auth.uid());
 create policy "own standing or mod" on standing for select to authenticated using(user_id=auth.uid() or is_mod());
@@ -142,6 +146,29 @@ begin perform must_mod();
   else raise exception 'Unknown action.'; end if;
   insert into history(user_id,by,act,reason) values(u.id,me,act,note); perform log_mod(act||' '||uname||coalesce(' — '||nullif(note,''),''));
 end $$;
+-- Moderators can set any role, including moderator (used after creating an account)
+create function mod_set_role(uname text, new_role text) returns void language plpgsql security definer set search_path=public as $$
+declare u profiles; me text := my_name();
+begin perform must_mod();
+  if new_role not in ('student','teacher','staff','moderator') then raise exception 'Invalid role.'; end if;
+  select * into u from profiles where username=uname;
+  if u.id is null then raise exception 'Account not found.'; end if;
+  if u.id = auth.uid() and new_role <> 'moderator' then raise exception 'You cannot remove your own moderator role.'; end if;
+  update profiles set role=new_role where id=u.id;
+  insert into history(user_id,by,act,reason) values(u.id,me,'role','set to '||new_role);
+  perform log_mod('set role of '||uname||' to '||new_role);
+end $$;
+-- Moderators can delete a non-moderator account. Posts/comments stay and show as Anonymous.
+create function mod_delete_account(uname text) returns void language plpgsql security definer set search_path=public as $$
+declare u profiles; me text := my_name();
+begin perform must_mod();
+  select * into u from profiles where username=uname;
+  if u.id is null then raise exception 'Account not found.'; end if;
+  if u.role = 'moderator' then raise exception 'Moderator accounts cannot be deleted here.'; end if;
+  if u.id = auth.uid() then raise exception 'You cannot delete your own account here.'; end if;
+  perform log_mod('deleted account '||uname);
+  delete from auth.users where id = u.id;
+end $$;
 create function mod_reports() returns jsonb language plpgsql security definer set search_path=public as $$ begin perform must_mod();
   return coalesce((select jsonb_agg(jsonb_build_object('id',r.id,'postId',r.post_id,'commentId',r.comment_id,'title',p.title,'board',p.board,'excerpt',left(coalesce(c.body,''),80),'reasons',r.reasons,
     'reporters',(select jsonb_agg(u.username) from profiles u where u.id=any(r.reporters)),'status',r.status,'outcome',r.outcome,'created',r.created,
@@ -164,6 +191,15 @@ create function mod_flag(pid bigint, k text) returns void language plpgsql secur
   if k='locked' then update posts set locked=not locked where id=pid; else update posts set pinned=not pinned where id=pid; end if; perform log_mod('toggled '||k||' on post #'||pid); end $$;
 create function mod_delete_post(pid bigint) returns void language plpgsql security definer set search_path=public as $$ begin perform must_mod();
   delete from posts where id=pid; perform log_mod('deleted post #'||pid); end $$;
+create function mod_edit_post(pid bigint, new_title text, new_body text) returns void language plpgsql security definer set search_path=public as $$
+declare t text := trim(coalesce(new_title,'')); b text := coalesce(new_body,'');
+begin perform must_mod();
+  if char_length(t) < 1 or char_length(t) > 120 then raise exception 'Title must be 1–120 characters.'; end if;
+  if char_length(b) > 2000 then raise exception 'Body must be at most 2000 characters.'; end if;
+  if not exists(select 1 from posts where id=pid) then raise exception 'Post not found.'; end if;
+  update posts set title=t, body=b, edited=true where id=pid;
+  perform log_mod('edited post #'||pid);
+end $$;
 create function mod_delete_comment(cid bigint) returns void language plpgsql security definer set search_path=public as $$ begin perform must_mod();
   delete from comments where id=cid; perform log_mod('deleted comment #'||cid); end $$;
 create function set_words(on_ boolean, list text[]) returns void language plpgsql security definer set search_path=public as $$ begin perform must_mod();

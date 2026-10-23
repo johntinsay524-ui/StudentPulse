@@ -6,11 +6,23 @@ $('#meName').textContent = me.name;
 $('#meDot').replaceChildren(Auth.avatar(me.name));
 $('#logoutBtn').addEventListener('click', Auth.logout);
 
+// Drop the old local demo "moderator" account (password studentpulse123).
+// It cannot log in on the Supabase login page and only clutters the Students list.
+try {
+  if (me && me.name && me.name.toLowerCase() !== 'moderator') {
+    const all = JSON.parse(Store.get('studentpulse_users') || '{}');
+    if (all.moderator) {
+      delete all.moderator;
+      Store.set('studentpulse_users', JSON.stringify(all));
+    }
+  }
+} catch (_) {}
+
 const TITLES = {
   overview: ['Overview', 'What students are saying and what needs a decision'],
   reports:  ['Reports', 'Posts flagged by students, waiting on a decision'],
   students: ['Students', 'Standing and account actions'],
-  posts:    ['Posts', 'Pin, lock, or remove posts across every board'],
+  posts:    ['Posts', 'Edit, pin, lock, or remove posts across every board'],
   filter:   ['Word filter', 'Words and phrases students are not allowed to post']
 };
 
@@ -87,13 +99,68 @@ function renderFilter() {
   $('#wordList').innerHTML = f.list.length ? f.list.map(w => `<li class="chip"><span>${esc(w)}</span><button type="button" data-rmword="${esc(w)}" aria-label="Remove ${esc(w)} from the list">×</button></li>`).join('') : '<li class="empty">The list is empty, so nothing is blocked.</li>';
 }
 
+// Reports from Supabase (mod_reports RPC). Merged with local Mod.reports so nothing is lost.
+let sbReports = null;
+let reportsLoadError = '';
+async function loadModReports() {
+  reportsLoadError = '';
+  try {
+    if (typeof sb === 'undefined') return;
+    const { data: sess } = await sb.auth.getSession();
+    if (!sess?.session) {
+      reportsLoadError = 'Not signed in to Supabase — local reports only.';
+      return;
+    }
+    const { data, error } = await sb.rpc('mod_reports');
+    if (error) {
+      reportsLoadError = error.message || 'Could not load reports from the server.';
+      console.warn('mod_reports:', error);
+      return;
+    }
+    const rows = Array.isArray(data) ? data : (data == null ? [] : []);
+    sbReports = rows.map(r => ({
+      id: r.id,
+      postId: r.postId ?? r.postid,
+      cid: r.commentId ?? r.commentid ?? null,
+      title: r.title || '',
+      board: r.board || '',
+      excerpt: r.excerpt || '',
+      reasons: r.reasons || [],
+      reporters: (r.reporters || []).filter(Boolean),
+      status: r.status || 'open',
+      outcome: r.outcome || '',
+      time: r.created ? new Date(r.created).getTime() : Date.now(),
+      author: r.author || 'Anonymous',
+      revealed: r.revealed ? (r.author && r.author !== 'Anonymous' ? r.author : true) : null,
+      canReveal: !!r.canReveal || !!r.canreveal,
+      source: 'sb'
+    }));
+    if ($('#reportList')) render();
+  } catch (e) {
+    reportsLoadError = (e && e.message) || String(e);
+    console.warn('loadModReports', e);
+  }
+}
+loadModReports();
+
 // Everything on this page is drawn from the real saved data
 function render() {
-  const posts = Mod.posts(), roster = Auth.roster(), reports = Mod.reports();
+  const posts = window._modPosts || Mod.posts(), roster = Auth.roster();
+  // Prefer Supabase reports; also include any local-only reports not already in the server list
+  const localReports = Mod.reports();
+  const reports = (() => {
+    if (!sbReports) return localReports;
+    const seen = new Set(sbReports.map(r => 'sb:' + r.id));
+    const extra = localReports.filter(r => {
+      const key = r.cid ? 'c' + r.cid : 'p' + r.postId;
+      return !sbReports.some(s => (s.cid ? 'c' + s.cid : 'p' + s.postId) === key && s.status === r.status);
+    });
+    return sbReports.concat(extra);
+  })();
   const students = roster.filter(u => u.role !== 'moderator');
   const live = new Set(posts.map(p => p.id)), liveC = Mod.liveComments();
-  const open = reports.filter(r => r.status === 'open').reverse();
-  const done = reports.filter(r => r.status !== 'open').reverse().slice(0, 10);
+  const open = reports.filter(r => r.status === 'open').slice().sort((a, b) => (b.time || 0) - (a.time || 0));
+  const done = reports.filter(r => r.status !== 'open').slice().sort((a, b) => (b.time || 0) - (a.time || 0)).slice(0, 10);
 
   // Overview numbers
   const banned = students.filter(u => u.banned).length;
@@ -118,26 +185,33 @@ function render() {
 
   // Reports
   const reportRow = (r, isDone) => {
-    const who = r.revealed || r.author;
+    const revealedName = typeof r.revealed === 'string' && r.revealed ? r.revealed : null;
+    const who = revealedName || r.author;
     const what = r.cid ? 'comment' : 'post';
-    const alive = r.cid ? live.has(r.postId) && liveC.has(r.cid) : live.has(r.postId);
+    const alive = r.cid
+      ? ([...live].some(id => String(id) === String(r.postId)) && [...liveC].some(id => String(id) === String(r.cid)))
+      : [...live].some(id => String(id) === String(r.postId));
     const stu = students.find(u => same(u.name, who));
-    const n = r.reporters.length;
+    const n = (r.reporters || []).length;
     let btns = '<button class="ok" data-act="dismiss">Dismiss</button>';
     if (alive) btns += '<button class="dng" data-act="remove">Remove ' + what + '</button>';
     if (stu && !stu.banned) btns += '<button class="dng" data-act="warn">Warn student</button><button class="dng" data-act="ban">Ban student</button>';
-    if (!r.revealed && r.author === 'Anonymous' && alive && r.reasons.some(x => SERIOUS.includes(x))) btns += '<button class="dng" data-act="reveal">Reveal author</button>';
+    const canReveal = r.canReveal || (!revealedName && r.author === 'Anonymous' && alive && (r.reasons || []).some(x => SERIOUS.includes(x)));
+    if (canReveal && !revealedName) btns += '<button class="dng" data-act="reveal">Reveal author</button>';
     const note = isDone ? `<div class="result">✓ ${esc(r.outcome)}</div>`
       : !alive ? '<div class="result">This ' + what + ' was already removed.</div>'
-      : r.revealed ? '<div class="result">Author revealed: <b>' + esc(r.revealed) + '</b> (logged)</div>'
+      : revealedName ? '<div class="result">Author revealed: <b>' + esc(revealedName) + '</b> (logged)</div>'
       : r.author === 'Anonymous' ? '<div class="result">Anonymous post: the author is hidden. It can be revealed only if reported for bullying, harassment or a threat.</div>' : '';
     return `<li class="rrow${isDone ? ' done' : ''}" data-id="${esc(r.id)}">
-      <div class="rbody">${r.reasons.map(x => `<span class="reason">${esc(x)}</span>`).join(' ')}
+      <div class="rbody">${(r.reasons || []).map(x => `<span class="reason">${esc(x)}</span>`).join(' ')}
         <div class="snip">${r.cid ? 'Comment on “' + esc(r.title) + '”' : esc(r.title)} — in ${esc(r.board)}</div>${r.cid ? '<div class="meta">“' + esc(r.excerpt || '(photo only)') + '”</div>' : ''}
-        <div class="meta">posted by <b>${esc(who)}</b>${r.revealed ? ' (revealed)' : ''} · reported by <b>${n === 1 ? esc(r.reporters[0]) : n + ' students'}</b> · ${ago(r.time)}</div>${note}</div>
+        <div class="meta">posted by <b>${esc(who)}</b>${revealedName ? ' (revealed)' : ''} · reported by <b>${n === 1 ? esc(r.reporters[0]) : n + ' students'}</b> · ${ago(r.time)}</div>${note}</div>
       <div class="ra">${btns}</div></li>`;
   };
-  $('#reportList').innerHTML = open.length ? open.map(r => reportRow(r, false)).join('') : '<li class="empty">No open reports. Nothing needs a decision right now.</li>';
+  const emptyMsg = reportsLoadError
+    ? 'No open reports. (Server: ' + esc(reportsLoadError) + ')'
+    : 'No open reports. Nothing needs a decision right now.';
+  $('#reportList').innerHTML = open.length ? open.map(r => reportRow(r, false)).join('') : '<li class="empty">' + emptyMsg + '</li>';
   $('#doneTitle').hidden = $('#doneList').hidden = !done.length;
   $('#doneList').innerHTML = done.map(r => reportRow(r, true)).join('');
 
@@ -149,8 +223,14 @@ function render() {
     const why = u.banned ? `<small class="why">${u.banReason ? '“' + esc(u.banReason) + '”' : 'No reason recorded'} · ${esc(u.bannedBy || 'a moderator')}${u.bannedAt ? ', ' + when(u.bannedAt) : ''}</small>` : '';
     const status = u.banned ? 'Banned' : u.warns ? u.warns + (u.warns === 1 ? ' warning' : ' warnings') : 'Good standing';
     const cls = u.banned ? 'banned' : u.warns ? 'warned' : '';
-    const acts = isMod ? '' : '<button data-uact="hist">History</button><button data-uact="reset">Reset password</button>' + (u.warns ? '<button data-uact="unwarn">Remove warning</button>' : '') + (u.banned ? '<button data-uact="unban">Unban</button>'
-      : '<button data-uact="warn">Warn</button><button class="dng" data-uact="ban">Ban</button>');
+    let acts = '';
+    if (!isMod) {
+      acts = '<button data-uact="hist">History</button><button data-uact="reset">Reset password</button>';
+      if (u.warns) acts += '<button data-uact="unwarn">Remove warning</button>';
+      if (u.banned) acts += '<button data-uact="unban">Unban</button>';
+      else acts += '<button data-uact="warn">Warn</button><button class="dng" data-uact="ban">Ban</button>';
+      acts += '<button class="dng" data-uact="delete">Delete</button>';
+    }
     return `<tr data-user="${esc(u.name)}" class="${cls}"><td class="un"><span class="nm">${esc(u.name)}</span></td>
       <td>${isMod ? '<span class="pill r-moderator">Moderator</span>' : '<select class="rolesel" data-urole aria-label="Role for ' + esc(u.name) + '">' + ['student', 'teacher', 'staff'].map(r => '<option value="' + r + '"' + (u.role === r ? ' selected' : '') + '>' + Auth.roleLabel(r) + '</option>').join('') + '</select>'}</td>
       <td>${u.joined ? new Date(u.joined).toLocaleDateString([], { month: 'short', year: 'numeric' }) : '—'}</td>
@@ -158,14 +238,54 @@ function render() {
   }).join('');
   Auth.decorate('#studentBody .nm');
 
-  // Posts
-  $('#postList').innerHTML = posts.length ? posts.map(p => `<li class="rrow prow" data-id="${esc(p.id)}">
+  // Posts (prefer live Supabase list when available)
+  const list = (window._modPosts && window._modPosts.length) ? window._modPosts : posts.map(p => ({
+    id: p.id, board: p.board, title: p.title, body: p.body || '', author: p.author,
+    comments: p.comments, score: p.score, pinned: p.pinned, locked: p.locked, source: 'local'
+  }));
+  $('#postList').innerHTML = list.length ? list.map(p => `<li class="rrow prow" data-id="${esc(p.id)}" data-source="${esc(p.source || 'sb')}">
       <div class="rbody"><div class="snip">${esc(p.title)}</div>
-        <div class="meta">${esc(p.board)} · <b>${esc(p.author)}</b> · ${p.comments} comments · ${p.score} points</div>
-        <div class="flags">${p.pinned ? '<span class="fl pinned">Pinned</span>' : ''}${p.locked ? '<span class="fl locked">Locked</span>' : ''}</div></div>
-      <div class="ra"><button data-pact="pin">${p.pinned ? 'Unpin' : 'Pin'}</button><button data-pact="lock">${p.locked ? 'Unlock' : 'Lock'}</button><button class="dng" data-pact="del">Delete</button></div>
+        <div class="meta">${esc(p.board || '')} · <b>${esc(p.author || 'Anonymous')}</b>${p.comments != null ? ' · ' + p.comments + ' comments' : ''}${p.score != null ? ' · ' + p.score + ' points' : ''}</div>
+        <div class="flags">${p.pinned ? '<span class="fl pinned">Pinned</span>' : ''}${p.locked ? '<span class="fl locked">Locked</span>' : ''}${p.edited ? '<span class="fl">Edited</span>' : ''}</div>
+        ${p.body ? '<div class="excerpt">' + esc(String(p.body).slice(0, 160)) + (String(p.body).length > 160 ? '…' : '') + '</div>' : ''}</div>
+      <div class="ra"><button data-pact="edit">Edit</button><button data-pact="pin">${p.pinned ? 'Unpin' : 'Pin'}</button><button data-pact="lock">${p.locked ? 'Unlock' : 'Lock'}</button><button class="dng" data-pact="del">Delete</button></div>
     </li>`).join('') : '<li class="empty">No posts on the board yet.</li>';
 }
+
+// Load real posts from Supabase for the Posts tab (board is already on Supabase)
+async function loadModPosts() {
+  if (typeof sb === 'undefined') return;
+  try {
+    const { data: sess } = await sb.auth.getSession();
+    if (!sess.session) return;
+    const { data, error } = await sb.from('posts_public').select('id,board,mood,title,body,author,author_display,comments:comments_public(count),score,pinned,locked,edited').order('pinned', { ascending: false }).order('id', { ascending: false });
+    // comments count via embed can be awkward; fall back to a simpler select
+    if (error) {
+      const { data: rows, error: e2 } = await sb.from('posts_public').select('id,board,mood,title,body,author,author_display,score,pinned,locked,edited').order('id', { ascending: false });
+      if (e2 || !rows) return;
+      window._modPosts = rows.map(p => ({
+        id: p.id, board: p.board, title: p.title, body: p.body || '',
+        author: p.author_display || p.author || 'Anonymous',
+        score: p.score, pinned: !!p.pinned, locked: !!p.locked, edited: !!p.edited, source: 'sb'
+      }));
+    } else {
+      window._modPosts = (data || []).map(p => ({
+        id: p.id, board: p.board, title: p.title, body: p.body || '',
+        author: p.author_display || p.author || 'Anonymous',
+        score: p.score, pinned: !!p.pinned, locked: !!p.locked, edited: !!p.edited, source: 'sb'
+      }));
+    }
+    // Only re-render the posts panel if we're looking at it or after first load
+    const postsPanel = $('#posts');
+    if (postsPanel && postsPanel.classList.contains('on')) render();
+    else if ($('#postList')) {
+      // refresh list quietly
+      const prev = $$('.tab-btn.on')[0];
+      render();
+    }
+  } catch (_) { /* keep local Mod.posts fallback */ }
+}
+loadModPosts();
 
 document.addEventListener('click', async e => {
   const b = e.target.closest('button');
@@ -197,25 +317,42 @@ document.addEventListener('click', async e => {
 
   // Reports
   if (b.dataset.act) {
-    const r = Mod.reports().find(x => x.id === b.closest('.rrow').dataset.id);
+    const rid = b.closest('.rrow').dataset.id;
+    const list = sbReports || Mod.reports();
+    const r = list.find(x => String(x.id) === String(rid));
     if (!r) return;
     const act = b.dataset.act;
+    const fromSb = r.source === 'sb' || !!(sbReports && sbReports.some(x => String(x.id) === String(rid)));
+    const whoName = (typeof r.revealed === 'string' && r.revealed) ? r.revealed : r.author;
     if (act === 'reveal') {
       if (!await UI.confirm('Reveal who wrote this anonymous ' + (r.cid ? 'comment' : 'post') + '? This is recorded in the activity log.', { title: 'Reveal author', ok: 'Reveal', danger: true })) return;
-      if (Mod.reveal(r.id)) Mod.log(me.name, `revealed the author of the anonymous ${r.cid ? 'comment on' : 'post'} "${r.title}"`);
-      else await UI.alert('The author of this older post could not be found.', { title: 'Cannot reveal' });
-      render(); return;
+      if (fromSb) {
+        const { data, error } = await sb.rpc('mod_reveal', { rid: Number(rid) });
+        if (error) { await UI.alert(error.message, { title: 'Cannot reveal' }); return; }
+        if (data) r.revealed = data;
+      } else {
+        if (Mod.reveal(r.id)) Mod.log(me.name, `revealed the author of the anonymous ${r.cid ? 'comment on' : 'post'} "${r.title}"`);
+        else await UI.alert('The author of this older post could not be found.', { title: 'Cannot reveal' });
+      }
+      await loadModReports(); render(); return;
     }
-    if (act === 'remove') r.cid ? Mod.removeComment(r.postId, r.cid) : Mod.removePost(r.postId);
+    if (act === 'remove') {
+      if (fromSb) {
+        if (r.cid) await sb.rpc('mod_delete_comment', { cid: Number(r.cid) });
+        else await sb.rpc('mod_delete_post', { pid: Number(r.postId) });
+      } else {
+        r.cid ? Mod.removeComment(r.postId, r.cid) : Mod.removePost(r.postId);
+      }
+    }
     let reason = '';
     if (act === 'warn' || act === 'ban') {
       reason = await UI.prompt(act === 'ban' ? 'Moderators can see this reason later. The student is not shown it.' : 'Optional. Moderators can see this in the history.',
-        { title: (act === 'ban' ? 'Ban ' : 'Warn ') + (r.revealed || r.author), label: act === 'ban' ? 'Reason for the ban' : 'Reason for the warning',
+        { title: (act === 'ban' ? 'Ban ' : 'Warn ') + whoName, label: act === 'ban' ? 'Reason for the ban' : 'Reason for the warning',
           value: `Reported for ${r.reasons.join(', ')}: ${r.cid ? 'comment on ' : ''}"${r.title}"`, required: act === 'ban', ok: act === 'ban' ? 'Ban student' : 'Warn student', danger: act === 'ban' });
       if (reason === null) return;
-      Auth.moderate(r.revealed || r.author, act, reason);
+      Auth.moderate(whoName, act, reason);
     }
-    const t = `"${r.title}"`, who = r.revealed || r.author;
+    const t = `"${r.title}"`, who = whoName;
     const subj = r.cid ? `${who}'s comment on ${t}` : `${who}'s post ${t}`;
     const [outcome, text] = {
       dismiss: ['Dismissed', `dismissed the report on ${subj}`],
@@ -223,8 +360,14 @@ document.addEventListener('click', async e => {
       warn:    ['Student warned', `warned ${who} over ${r.cid ? 'a comment on ' : ''}${t}`],
       ban:     ['Student banned', `banned ${who} over ${r.cid ? 'a comment on ' : ''}${t}`]
     }[act];
-    Mod.resolve(r.id, outcome);
-    Mod.log(me.name, text + (reason ? ' — ' + reason : ''));
+    if (fromSb) {
+      const { error } = await sb.rpc('mod_resolve', { rid: Number(rid), outcome });
+      if (error) { await UI.alert(error.message, { title: 'Could not resolve report' }); return; }
+    } else {
+      Mod.resolve(r.id, outcome);
+      Mod.log(me.name, text + (reason ? ' — ' + reason : ''));
+    }
+    await loadModReports();
   }
 
   // Students table
@@ -239,6 +382,34 @@ document.addEventListener('click', async e => {
         await UI.alert('Give it to them privately and ask them to change it on their profile page.', { title: 'New password for ' + user, password: pw });
       } else await UI.alert('Make sure you are logged in as a moderator and the account still exists.', { title: 'Could not reset the password' });
       render();
+      return;
+    }
+    if (act === 'delete') {
+      if (!await UI.confirm(`Permanently delete ${user}'s account? They will not be able to log in. Their posts and comments stay on the board as Anonymous.`, { title: 'Delete account', ok: 'Delete account', danger: true })) return;
+      if (typeof SB === 'undefined' || !SB.deleteAccount) {
+        await UI.alert('Supabase is not loaded. Hard-refresh the page and try again.', { title: 'Could not delete' });
+        return;
+      }
+      const res = await SB.deleteAccount(user);
+      if (res.error) {
+        // Fall back: remove local-only demo accounts that were never in Supabase
+        const all = (() => { try { return JSON.parse(Store.get('studentpulse_users')) || {}; } catch { return {}; } })();
+        const key = String(user).toLowerCase();
+        if (all[key] && all[key].role !== 'moderator') {
+          delete all[key];
+          Store.set('studentpulse_users', JSON.stringify(all));
+          if (Mod.forgetUser) Mod.forgetUser(user);
+          Mod.log(me.name, 'deleted account ' + user + ' (local only)');
+          render();
+          await UI.alert('Removed from this browser. Supabase said: ' + res.error, { title: 'Account removed locally' });
+        } else {
+          await UI.alert(res.error, { title: 'Could not delete account' });
+        }
+        return;
+      }
+      Mod.log(me.name, 'deleted account ' + user);
+      render();
+      await UI.alert(user + ' can no longer log in. Their posts and comments remain as Anonymous.', { title: 'Account deleted' });
       return;
     }
     const VERB = { warn: 'warned', unwarn: 'removed one warning from', ban: 'banned', unban: 'unbanned' };
@@ -260,17 +431,90 @@ document.addEventListener('click', async e => {
 
   // Posts
   if (b.dataset.pact) {
-    const id = b.closest('.rrow').dataset.id, act = b.dataset.pact;
-    const post = Mod.posts().find(p => p.id === id);
-    if (post) {
-      if (act === 'del') {
-        if (!await UI.confirm(`Delete "${post.title}"? This also deletes its comments and photos.`, { title: 'Delete post', ok: 'Delete', danger: true })) return;
-        Mod.removePost(id);
+    const row = b.closest('.rrow');
+    const id = row.dataset.id, act = b.dataset.pact, source = row.dataset.source || 'local';
+    const fromSb = (window._modPosts || []).find(p => String(p.id) === String(id));
+    const fromLocal = Mod.posts().find(p => String(p.id) === String(id));
+    const post = fromSb || fromLocal;
+    if (!post) { render(); return; }
+
+    if (act === 'edit') {
+      const newTitle = await UI.prompt('Change the title students see on the board.', {
+        title: 'Edit post title', label: 'Title', value: post.title || '', required: true, ok: 'Next'
+      });
+      if (newTitle === null) return;
+      const newBody = await UI.prompt('Change the body text. Leave blank to clear it.', {
+        title: 'Edit post body', label: 'Body', value: post.body || '', ok: 'Save changes'
+      });
+      if (newBody === null) return;
+      const title = newTitle.trim();
+      if (!title || title.length > 120) {
+        await UI.alert('Title must be 1–120 characters.', { title: 'Could not save' });
+        return;
+      }
+      // Prefer Supabase (live board); also update local feed when present
+      let ok = false, errMsg = '';
+      if (typeof sb !== 'undefined') {
+        const { data: sess } = await sb.auth.getSession();
+        if (sess.session) {
+          const { error } = await sb.rpc('mod_edit_post', { pid: Number(id), new_title: title, new_body: newBody });
+          if (error) errMsg = error.message;
+          else ok = true;
+        }
+      }
+      if (!ok && fromLocal) {
+        Mod.editPost(id, p => {
+          const h2 = p.querySelector('h2'); if (h2) h2.textContent = title;
+          let para = p.querySelector('.pb > p');
+          if (newBody) {
+            if (!para) { para = document.createElement('p'); const h = p.querySelector('h2'); if (h) h.after(para); }
+            para.textContent = newBody;
+          } else if (para) para.remove();
+        });
+        ok = true;
+      }
+      if (!ok) {
+        await UI.alert(errMsg || 'Could not edit the post. Log in again as moderator, and run supabase-migration-mod-create.sql if you have not.', { title: 'Could not save' });
+        return;
+      }
+      Mod.log(me.name, `edited "${title}"`);
+      if (fromSb) { fromSb.title = title; fromSb.body = newBody; fromSb.edited = true; }
+      await loadModPosts();
+      render();
+      return;
+    }
+
+    if (act === 'del') {
+      if (!await UI.confirm(`Delete "${post.title}"? This also deletes its comments and photos.`, { title: 'Delete post', ok: 'Delete', danger: true })) return;
+      let ok = false;
+      if (typeof sb !== 'undefined') {
+        const { data: sess } = await sb.auth.getSession();
+        if (sess.session) {
+          const { error } = await sb.rpc('mod_delete_post', { pid: Number(id) });
+          if (!error) ok = true;
+          else await UI.alert(error.message, { title: 'Could not delete' });
+        }
+      }
+      if (!ok && fromLocal) { Mod.removePost(id); ok = true; }
+      if (ok) {
         Mod.log(me.name, `deleted "${post.title}"`);
-      } else {
-        const key = act === 'pin' ? 'pinned' : 'locked';
-        Mod.toggle(id, key);
+        if (window._modPosts) window._modPosts = window._modPosts.filter(p => String(p.id) !== String(id));
+      }
+    } else if (act === 'pin' || act === 'lock') {
+      const key = act === 'pin' ? 'pinned' : 'locked';
+      let ok = false;
+      if (typeof sb !== 'undefined') {
+        const { data: sess } = await sb.auth.getSession();
+        if (sess.session) {
+          const { error } = await sb.rpc('mod_flag', { pid: Number(id), k: key });
+          if (!error) ok = true;
+          else await UI.alert(error.message, { title: 'Could not update' });
+        }
+      }
+      if (!ok && fromLocal) { Mod.toggle(id, key); ok = true; }
+      if (ok) {
         Mod.log(me.name, `${post[key] ? 'un' : ''}${key === 'pinned' ? 'pinned' : 'locked'} "${post.title}"`);
+        if (fromSb) fromSb[key] = !fromSb[key];
       }
     }
   }
@@ -282,10 +526,15 @@ $('#newAcctForm').addEventListener('submit', async e => {
   e.preventDefault();
   const f = e.target.elements, err = $('#newAcctErr');
   err.textContent = '';
-  const role = f.role.value, name = f.username.value.trim(), email = f.email.value.trim();
+  if (typeof SB === 'undefined' || !SB.createAccount) {
+    err.textContent = 'Supabase is not loaded. Hard-refresh the page (Ctrl+Shift+R / Cmd+Shift+R).';
+    return;
+  }
+  const role = f.role.value, name = f.username.value.trim(), email = (f.email && f.email.value || '').trim();
+  if (!email) { err.textContent = 'Email is required — they log in with it.'; return; }
   if (role === 'moderator' && !await UI.confirm('Moderators can warn, ban and see every report.', { title: 'Create a moderator account for ' + name + '?', ok: 'Create moderator' })) return;
-  const btn = e.target.querySelector('button[type="submit"]');
-  if (btn) btn.disabled = true;
+  const btn = e.target.querySelector('button[type="submit"], button.post-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Creating…'; }
   try {
     const res = await SB.createAccount(name, email, f.password.value, role);
     if (res.error) { err.textContent = res.error; return; }
@@ -293,18 +542,19 @@ $('#newAcctForm').addEventListener('submit', async e => {
     e.target.reset();
     render();
     const lines = [];
-    if (res.generated) lines.push('Temporary password (give it to them privately):');
-    else lines.push('They log in with the password you chose. Ask them to change it on their profile page.');
-    if (res.needsConfirm) lines.push('A confirmation link was sent to ' + email + '. They must open it before they can log in.');
+    lines.push('They log in with email: ' + email);
+    if (res.generated) lines.push('Temporary password (give it privately and ask them to change it):');
+    else lines.push('Password: the one you chose. Ask them to change it on their profile page.');
+    if (res.needsConfirm) lines.push('A confirmation link was sent to ' + email + '. They must open that link before login will work.');
     if (res.notice) lines.push(res.notice);
-    if (res.needRelogin) lines.push('Your moderator session was interrupted (email confirmation is off in Supabase). Log in again.');
     await UI.alert(lines.join('\n\n'), {
       title: 'Account created for ' + name + ' (' + res.role + ')',
       password: res.generated ? res.password : undefined
     });
-    if (res.needRelogin) location.replace('login.html');
+  } catch (ex) {
+    err.textContent = (ex && ex.message) ? ex.message : String(ex);
   } finally {
-    if (btn) btn.disabled = false;
+    if (btn) { btn.disabled = false; btn.textContent = 'Create account'; }
   }
 });
 
@@ -329,5 +579,7 @@ document.addEventListener('change', e => {
   if (Auth.setRole(user, s.value)) Mod.log(me.name, 'changed the role of ' + user + ' to ' + Auth.roleLabel(s.value));
   render();
 });
-window.addEventListener('storage', render);
+window.addEventListener('storage', () => { loadModReports(); render(); });
+// Refresh reports periodically while the moderator page is open
+setInterval(() => { if (!document.hidden) loadModReports(); }, 15000);
 render();

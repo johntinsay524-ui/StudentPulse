@@ -15,9 +15,38 @@ function who(x) {
   return [Auth.avatar(x.author), n, x.author_role && x.author_role !== 'student' ? h('span', { class: 'rb r-' + x.author_role }, Auth.roleLabel(x.author_role)) : null];
 }
 function reportMenu(anchor, p, c) {
-  if (anchor.nextElementSibling && anchor.nextElementSibling.classList.contains('rpmenu')) return anchor.nextElementSibling.remove();
-  anchor.after(h('div', { class: 'rpmenu' }, h('span', {}, 'Why are you reporting this?'), REASONS.map(r => h('button', { type: 'button', onclick: async () => {
-    const { error } = await sb.rpc('report_item', { p: p.id, c: c ? c.id : null, reason: r }); if (!fail(error)) load(); } }, r))));
+  // Toggle closed if already open
+  if (anchor.classList.contains('cm')) {
+    const old = anchor.querySelector(':scope > .rpmenu');
+    if (old) { old.remove(); return; }
+  } else {
+    const next = anchor.nextElementSibling;
+    if (next && next.classList.contains('rpmenu')) { next.remove(); return; }
+  }
+  const menu = h('div', { class: 'rpmenu' }, h('span', {}, 'Why are you reporting this?'), REASONS.map(r => h('button', { type: 'button', onclick: async () => {
+    const { error } = await sb.rpc('report_item', { p: p.id, c: c ? c.id : null, reason: r });
+    if (error) { UI.alert(error.message, { title: 'Could not submit report' }); return; }
+    // Bridge to localStorage so the moderator page sees the report even if the server list is slow
+    try {
+      if (typeof Mod !== 'undefined' && Mod.report && me) {
+        const src = c || p;
+        const authorLabel = src.anonymous || !src.author
+          ? 'Anonymous'
+          : (src.author_display || src.author);
+        Mod.report({
+          id: p.id,
+          author: authorLabel,
+          title: p.title,
+          board: p.board,
+          cid: c ? c.id : undefined,
+          excerpt: c ? String(c.body || '').slice(0, 80) : undefined
+        }, me.username || me.display || 'student', r);
+      }
+    } catch (_) {}
+    load();
+  } }, r)));
+  if (anchor.classList.contains('cm')) anchor.appendChild(menu);
+  else anchor.after(menu);
 }
 async function sendComment(p, form) {
   const input = form.querySelector('.cm-text'), text = input.value.trim(), img = cImg.get(p.id) || '';
