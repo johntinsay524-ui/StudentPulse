@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Email confirmed — Student Pulse</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="auth.css">
+<script src="store.js"></script>
+<style>
+  .big{font-size:42px;line-height:1;margin:0 0 10px;text-align:center}
+  .authcard h1{text-align:center}
+  .authcard .sub{text-align:center;font-size:15px;color:var(--mu);margin:0 0 22px}
+  .gologin{display:block;text-align:center;text-decoration:none;padding:10px}
+</style>
+</head>
+<body>
+<main class="authwrap">
+  <section class="card authcard" aria-live="polite">
+    <div class="big" id="icon" aria-hidden="true">✅</div>
+    <h1 id="title">You are confirmed!</h1>
+    <p class="sub" id="msg">Your email is confirmed and your account has been created. Return to the login page to log in.</p>
+    <a class="post-btn gologin" href="login.html">Go to the login page</a>
+  </section>
+</main>
+<script>
+  // Supabase confirms the email on its own server before sending people here.
+  // If the link was old or already used, it adds an error to the address; show a friendlier message.
+  (function () {
+    var h = location.hash || '';
+    if (/error/i.test(h)) {
+      document.getElementById('icon').textContent = '⚠️';
+      document.getElementById('title').textContent = 'This link cannot be used';
+      document.getElementById('msg').textContent = 'It may have expired or already been used. If you already confirmed your email, just log in. Otherwise, sign up again to get a new link.';
+    }
+    // remove the long token from the address bar
+    if (h && history.replaceState) history.replaceState(null, '', location.pathname);
+  })();
+</script>
+</body>
+</html>

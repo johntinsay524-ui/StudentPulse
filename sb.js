@@ -21,7 +21,7 @@ const SB = (() => {
   return {
     async login(email, pw) {
       const { error } = await sb.auth.signInWithPassword({ email: email.trim().toLowerCase(), password: pw });
-      if (error) return { error: /confirm/i.test(error.message) ? 'Please confirm your email first. Check your inbox for the link.' : 'Wrong email or password.' };
+      if (error) return { error: /confirm/i.test(error.message) ? 'Please confirm your email first. Check your inbox (and spam) for the link.' : 'Wrong email or password.' };
       return finish();
     },
     async signup(name, email, pw, pw2) {
@@ -33,10 +33,13 @@ const SB = (() => {
       const { data: free, error: freeErr } = await sb.rpc('username_free', { n: name });
       if (freeErr) return { error: 'Could not check the username: ' + freeErr.message };
       if (free === false) return { error: 'That username is taken.' };
-      const { data, error } = await sb.auth.signUp({ email, password: pw, options: { data: { username: name }, emailRedirectTo: new URL('login.html', location.href).href } });
+      // The confirmation link lands on confirmed.html, which tells the student their account is ready.
+      const { data, error } = await sb.auth.signUp({ email, password: pw, options: { data: { username: name }, emailRedirectTo: new URL('confirmed.html', location.href).href } });
       if (error) return { error: error.message };
+      // When "Confirm email" is on, Supabase answers an already-registered email with an empty identities list instead of an error.
+      if (data.user && data.user.identities && data.user.identities.length === 0) return { error: 'That email already has an account. Try logging in instead.' };
       if (data.session) return finish();   // only if confirmation is switched off in Supabase
-      return { notice: 'Almost done! We sent a confirmation link to ' + email + '. Open it, then log in here.' };
+      return { sent: true, email, notice: 'Almost done! We sent a confirmation link to ' + email + '. Open it, then come back here and log in.' };
     },
     logout: async () => { await sb.auth.signOut(); }
   };
