@@ -1,7 +1,6 @@
-// Supabase login and sign-up. Students type a username; behind the scenes it becomes a private email address.
+// Supabase login and sign-up. Students sign up with an email (confirmed by link) and a username; they log in with the email.
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const SB = (() => {
-  const emailOf = n => n.trim().toLowerCase() + '@users.studentpulse.app';
   async function finish() {
     const { data: { user } } = await sb.auth.getUser();
     const { data: p } = await sb.from('profiles').select('*').eq('id', user.id).single();
@@ -20,21 +19,23 @@ const SB = (() => {
     Store.set('studentpulse_session', JSON.stringify({ name: p.username, role: p.role }));
   }
   return {
-    async login(name, pw) {
-      const { error } = await sb.auth.signInWithPassword({ email: emailOf(name), password: pw });
-      return error ? { error: 'Wrong username or password.' } : finish();
+    async login(email, pw) {
+      const { error } = await sb.auth.signInWithPassword({ email: email.trim().toLowerCase(), password: pw });
+      if (error) return { error: /confirm/i.test(error.message) ? 'Please confirm your email first. Check your inbox for the link.' : 'Wrong email or password.' };
+      return finish();
     },
-    async signup(name, pw, pw2) {
-      name = name.trim();
+    async signup(name, email, pw, pw2) {
+      name = name.trim(); email = email.trim().toLowerCase();
       if (!/^[A-Za-z0-9_]{3,20}$/.test(name)) return { error: 'Username must be 3–20 letters, numbers or underscores.' };
+      if (!/^\S+@\S+\.\S+$/.test(email)) return { error: 'Enter a valid email address.' };
       if (pw.length < 8) return { error: 'Password must be at least 8 characters.' };
       if (pw !== pw2) return { error: 'Passwords do not match.' };
       const { data: free } = await sb.rpc('username_free', { n: name });
       if (!free) return { error: 'That username is taken.' };
-      const { data, error } = await sb.auth.signUp({ email: emailOf(name), password: pw, options: { data: { username: name } } });
+      const { data, error } = await sb.auth.signUp({ email, password: pw, options: { data: { username: name }, emailRedirectTo: new URL('login.html', location.href).href } });
       if (error) return { error: error.message };
-      if (!data.session) return { error: 'Sign-up needs "Confirm email" switched off in Supabase (Authentication > Providers > Email).' };
-      return finish();
+      if (data.session) return finish();   // only if confirmation is switched off in Supabase
+      return { notice: 'Almost done! We sent a confirmation link to ' + email + '. Open it, then log in here.' };
     },
     logout: async () => { await sb.auth.signOut(); }
   };

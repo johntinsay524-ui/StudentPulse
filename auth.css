@@ -8,5 +8,6 @@
 .authcard input:focus-visible{outline:2px solid var(--gold);outline-offset:-1px}
 .authcard .post-btn{width:100%;padding:10px}
 .err{color:var(--red);font-size:13px;min-height:20px;margin-bottom:8px}
+.notice{color:var(--grn);font-size:13.5px;margin-bottom:10px}.notice:empty{display:none}
 .alt{text-align:center;color:var(--mu);font-size:13px;margin:16px 0 0}
 .alt a{color:var(--gold)}

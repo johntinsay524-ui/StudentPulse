@@ -121,7 +121,7 @@ end $$;
 create function rename_me(n text) returns void language plpgsql security definer set search_path=public as $$ begin
   if n !~ '^[A-Za-z0-9_]{3,20}$' or lower(n)='anonymous' then raise exception 'Username must be 3–20 letters, numbers or underscores.'; end if;
   if exists(select 1 from profiles where username=n and id<>auth.uid()) then raise exception 'That username is taken.'; end if;
-  update profiles set username=n where id=auth.uid(); update auth.users set email=lower(n)||'@users.studentpulse.app' where id=auth.uid(); end $$;
+  update profiles set username=n where id=auth.uid(); end $$;
 create function delete_me() returns void language plpgsql security definer set search_path=public as $$ begin
   if is_mod() then raise exception 'Moderator accounts cannot be deleted here.'; end if;
   delete from auth.users where id=auth.uid(); end $$;   -- posts and comments stay, shown as Anonymous

@@ -15,8 +15,9 @@ function wire(formId, action) {
     err.textContent = '';
     const f = new FormData(form);
     const res = await action(f);
-    if (res.error) err.textContent = res.error; else go(res.role);
+    const nt = document.getElementById('notice'); if (nt) nt.textContent = res.notice || '';
+    if (res.error) err.textContent = res.error; else if (res.notice) form.reset(); else go(res.role);
   });
 }
-wire('loginForm',  f => SB.login(f.get('username'), f.get('password')));
-wire('signupForm', f => SB.signup(f.get('username'), f.get('password'), f.get('confirm')));
+wire('loginForm',  f => SB.login(f.get('email'), f.get('password')));
+wire('signupForm', f => SB.signup(f.get('username'), f.get('email'), f.get('password'), f.get('confirm')));
