@@ -386,30 +386,51 @@ document.addEventListener('click', async e => {
     }
     if (act === 'delete') {
       if (!await UI.confirm(`Permanently delete ${user}'s account? They will not be able to log in. Their posts and comments stay on the board as Anonymous.`, { title: 'Delete account', ok: 'Delete account', danger: true })) return;
-      if (typeof SB === 'undefined' || !SB.deleteAccount) {
-        await UI.alert('Supabase is not loaded. Hard-refresh the page and try again.', { title: 'Could not delete' });
-        return;
-      }
-      const res = await SB.deleteAccount(user);
-      if (res.error) {
-        // Fall back: remove local-only demo accounts that were never in Supabase
-        const all = (() => { try { return JSON.parse(Store.get('studentpulse_users')) || {}; } catch { return {}; } })();
-        const key = String(user).toLowerCase();
-        if (all[key] && all[key].role !== 'moderator') {
-          delete all[key];
-          Store.set('studentpulse_users', JSON.stringify(all));
-          if (Mod.forgetUser) Mod.forgetUser(user);
-          Mod.log(me.name, 'deleted account ' + user + ' (local only)');
-          render();
-          await UI.alert('Removed from this browser. Supabase said: ' + res.error, { title: 'Account removed locally' });
+
+      const stripLocal = () => {
+        try {
+          const all = JSON.parse(Store.get('studentpulse_users') || '{}') || {};
+          const key = String(user).toLowerCase();
+          if (all[key] && all[key].role !== 'moderator') {
+            delete all[key];
+            Store.set('studentpulse_users', JSON.stringify(all));
+          }
+          if (typeof Mod !== 'undefined' && Mod.forgetUser) Mod.forgetUser(user);
+        } catch (_) {}
+      };
+
+      let serverOk = false, serverErr = '';
+      try {
+        if (typeof sb === 'undefined') {
+          serverErr = 'Supabase client missing. Make sure sb.js and supabase-config.js load on this page, then hard-refresh.';
         } else {
-          await UI.alert(res.error, { title: 'Could not delete account' });
+          const { data: sess } = await sb.auth.getSession();
+          if (!sess?.session) {
+            serverErr = 'Your moderator login has expired. Log out, log in again with your moderator email, then try deleting.';
+          } else {
+            const { error } = await sb.rpc('mod_delete_account', { uname: user });
+            if (error) serverErr = error.message;
+            else serverOk = true;
+          }
         }
-        return;
+      } catch (e) {
+        serverErr = (e && e.message) ? e.message : String(e);
       }
-      Mod.log(me.name, 'deleted account ' + user);
+
+      stripLocal();
+      Mod.log(me.name, 'deleted account ' + user + (serverOk ? '' : ' (local only)'));
       render();
-      await UI.alert(user + ' can no longer log in. Their posts and comments remain as Anonymous.', { title: 'Account deleted' });
+
+      if (serverOk) {
+        await UI.alert(user + ' can no longer log in. Their posts and comments remain as Anonymous.', { title: 'Account deleted' });
+      } else {
+        await UI.alert(
+          'Removed from this browser’s student list.' +
+          (serverErr ? '\n\nServer could not delete the login: ' + serverErr +
+            '\n\nIf it says the function does not exist, run supabase-migration-mod-create.sql in the Supabase SQL Editor.' : ''),
+          { title: serverErr ? 'Removed locally only' : 'Account deleted' }
+        );
+      }
       return;
     }
     const VERB = { warn: 'warned', unwarn: 'removed one warning from', ban: 'banned', unban: 'unbanned' };
