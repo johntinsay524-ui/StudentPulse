@@ -46,7 +46,7 @@ button,input,textarea,select{font:inherit;color:inherit}button{cursor:pointer}
 .cmts form button{background:none;border:1px solid var(--bd);border-radius:4px;padding:5px 12px;color:var(--mu)}
 .rail .card{padding:14px;margin-bottom:14px}
 .bar{display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:6px;color:var(--mu)}
-.bar i{display:block;height:7px;border-radius:4px;background:var(--gold);min-width:2px}.bar span{width:84px}
+.bar i{display:block;height:7px;border-radius:4px;background:var(--gold);min-width:2px}.bar span{width:110px;flex-shrink:0;white-space:nowrap}
 .rules{font-size:13px;color:var(--mu);margin:0;padding-left:18px}
 .empty{text-align:center;color:var(--fa);padding:30px}
 @media(max-width:900px){.wrap{grid-template-columns:1fr}.side{order:-1}.boards{display:flex;gap:4px;overflow-x:auto}.boards button{width:auto;white-space:nowrap}.rail{order:2}}
