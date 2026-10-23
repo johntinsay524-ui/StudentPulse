@@ -2,6 +2,7 @@
 // Run: node server.js   (then open http://localhost:3000)
 const http = require('http'), fs = require('fs'), path = require('path'), crypto = require('crypto');
 const { DatabaseSync } = require('node:sqlite');
+const { findBlockedWord, normalize: normalizeWord } = require('./word-filter.js');
 const db = new DatabaseSync(process.env.DB || path.join(__dirname, 'studentpulse.db'));
 db.exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;
 CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY, name TEXT UNIQUE COLLATE NOCASE NOT NULL, display TEXT, role TEXT NOT NULL DEFAULT 'student',
@@ -32,12 +33,10 @@ if (!one('SELECT id FROM users LIMIT 1')) { const pw = tmp(); mkUser('moderator'
 if (!one('SELECT word FROM words LIMIT 1') && !one("SELECT 1 FROM settings WHERE key='seeded'")) { DEFAULT_WORDS.forEach(w => run('INSERT INTO words VALUES(?)', w)); run("INSERT INTO settings VALUES('seeded','1')"); }
 
 const pub = u => ({ name: u.name, display: u.display || u.name, role: u.role, bio: u.bio || '', avatar: u.avatar || '', joined: u.joined });
-const norm = s => String(s).normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ');
-const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 function blocked(u, ...texts) {   // word filter (moderators exempt)
   if (u.role === 'moderator' || (one("SELECT value v FROM settings WHERE key='filter_off'") || {}).v === '1') return;
-  const t = ' ' + norm(texts.join(' \n ')) + ' ';
-  for (const { word } of q('SELECT word FROM words')) if (new RegExp('[^\\p{L}\\p{N}]' + esc(norm(word).trim()) + '(?=[^\\p{L}\\p{N}])', 'u').test(t)) fail(422, 'Your text includes “' + word + '”, which is not allowed on this board. Please rephrase it.');
+  const word = findBlockedWord(texts.join('\n'), q('SELECT word FROM words').map(row => row.word));
+  if (word) fail(422, 'Your text includes “' + word + '”, which is not allowed on this board. Please rephrase it.');
 }
 const need = (me, role) => { if (!me) fail(401, 'Please log in.'); if (role && me.role !== role) fail(403, 'Moderators only.'); return me; };
 const userByName = n => one('SELECT * FROM users WHERE name=?', String(n));
@@ -202,8 +201,26 @@ on('POST', '/api/users/([^/]+)/action', ({ me, b, m }) => {   // warn, unwarn, b
 on('GET', '/api/logs', ({ me }) => { need(me, 'moderator'); return q('SELECT who,text,t FROM logs ORDER BY id DESC LIMIT 50'); });
 on('GET', '/api/words', ({ me }) => { need(me, 'moderator'); return { on: !one("SELECT 1 FROM settings WHERE key='filter_off' AND value='1'"), list: q('SELECT word FROM words ORDER BY word').map(r => r.word) }; });
 on('PUT', '/api/words', ({ me, b }) => {
-  need(me, 'moderator'); const list = [...new Set((b.list || []).map(w => String(w).trim().toLowerCase().replace(/\s+/g, ' ')).filter(w => w.length >= 2 && w.length <= 40))].slice(0, 200);
-  db.exec('BEGIN'); run('DELETE FROM words'); list.forEach(w => run('INSERT INTO words VALUES(?)', w)); run("INSERT INTO settings VALUES('filter_off',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", b.on === false ? '1' : '0'); db.exec('COMMIT');
+  need(me, 'moderator');
+  if (!Array.isArray(b.list) || b.list.length > 200) fail(400, 'The word list must contain no more than 200 entries.');
+  const list = [], seen = new Set();
+  for (const value of b.list) {
+    if (typeof value !== 'string') fail(400, 'Every blocked word or phrase must be text.');
+    const word = value.trim().toLowerCase().replace(/\s+/g, ' ');
+    const normalized = normalizeWord(word);
+    if (word.length < 2 || word.length > 40 || !normalized) fail(400, 'Each blocked word or phrase must be 2–40 characters and include a letter or number.');
+    if (!seen.has(normalized)) { seen.add(normalized); list.push(word); }
+  }
+  db.exec('BEGIN');
+  try {
+    run('DELETE FROM words');
+    list.forEach(w => run('INSERT INTO words VALUES(?)', w));
+    run("INSERT INTO settings VALUES('filter_off',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", b.on === false ? '1' : '0');
+    db.exec('COMMIT');
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
   log(me.name, 'updated the word filter'); return { ok: true };
 });
 on('POST', '/api/reset', ({ me }) => { need(me, 'moderator'); ['reports', 'logs', 'posts'].forEach(t => run('DELETE FROM ' + t)); return { ok: true }; });

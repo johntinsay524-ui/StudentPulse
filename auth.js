@@ -371,17 +371,10 @@ const Filter = (() => {
     return { on: true, list: DEFAULTS.slice() };
   };
   const write = v => Store.set(KEY, JSON.stringify(v));
-  const norm = s => String(s).normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ');
-  const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   // The listed word that appears in the text (whole words only), or null. Ignores who is logged in.
   const match = text => {
     const { on, list } = read(); if (!on) return null;
-    const t = ' ' + norm(text) + ' ';
-    for (const w of list) {
-      const n = norm(w).trim(); if (!n) continue;
-      if (new RegExp('[^\\p{L}\\p{N}]' + esc(n) + '(?=[^\\p{L}\\p{N}])', 'u').test(t)) return w;
-    }
-    return null;
+    return StudentPulseWordFilter.findBlockedWord(text, list);
   };
   const check = text => { const s = Auth.session(); return s && s.role === 'moderator' ? null : match(text); };
   const get = () => read();
@@ -389,8 +382,10 @@ const Filter = (() => {
     word = String(word).trim().toLowerCase().replace(/\s+/g, ' ');
     if (word.length < 2) return { error: 'Type a word or phrase (at least 2 characters).' };
     if (word.length > 40) return { error: 'Keep it under 40 characters.' };
+    const normalized = StudentPulseWordFilter.normalize(word);
+    if (!normalized) return { error: 'Add at least one letter or number.' };
     const v = read();
-    if (v.list.some(w => norm(w) === norm(word))) return { error: 'That word is already on the list.' };
+    if (v.list.some(w => StudentPulseWordFilter.normalize(w) === normalized)) return { error: 'That word is already on the list.' };
     if (v.list.length >= 200) return { error: 'The list is full (200 words).' };
     v.list.push(word); write(v); return { ok: true, word };
   };
