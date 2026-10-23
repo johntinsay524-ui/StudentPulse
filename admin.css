@@ -129,3 +129,7 @@ tr.banned .st{color:var(--red)}tr.banned .st::before{background:var(--red)}
 .chip button{background:none;border:0;color:var(--mu);font-size:16px;line-height:1;padding:2px 8px;border-radius:50%}
 .chip button:hover{color:var(--red)}
 .testout{flex:1 0 100%;font-size:14px;min-height:20px}.testout.bad{color:var(--red)}.testout.ok{color:var(--grn)}
+
+/* School mood labels: emoji and text on one line (the label column in style.css is a fixed 110px) */
+.moodbox .bar .mlabel{display:inline-flex;align-items:center;gap:8px;width:140px;flex-shrink:0;white-space:nowrap;line-height:1.3}
+.moodbox .bar .mlabel span{width:auto}

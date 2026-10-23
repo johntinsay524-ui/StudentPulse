@@ -104,7 +104,8 @@ function render() {
 
   $('#moodBox').innerHTML = MOODS.map(([k, label]) => {
     const pct = posts.length ? Math.round(posts.filter(p => p.mood === k).length / posts.length * 100) : 0;
-    return `<div class="bar"><span>${label}</span><i style="width:${pct}%"></i>${pct}%</div>`;
+    const [emoji, ...rest] = label.split(' ');
+    return `<div class="bar"><span class="mlabel"><span aria-hidden="true">${emoji}</span><span>${rest.join(' ')}</span></span><i style="width:${pct}%"></i>${pct}%</div>`;
   }).join('');
 
   renderChart(posts);
