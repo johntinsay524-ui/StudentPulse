@@ -30,4 +30,4 @@ function wire(formId, action) {
   });
 }
 wire('loginForm',  f => SB.login(f.get('email'), f.get('password')));
-wire('signupForm', f => SB.signup(f.get('username'), f.get('email'), f.get('password'), f.get('confirm')));
+wire('signupForm', f => SB.signup(f.get('username'), f.get('email'), f.get('password'), f.get('confirm'), f.get('role')));

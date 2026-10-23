@@ -11,7 +11,13 @@
 <main class="authwrap">
   <form class="card authcard" id="signupForm">
     <h1>Student Pulse</h1>
-    <p class="sub">Create your student account</p>
+    <p class="sub">Create your account</p>
+    <label for="role">I am a</label>
+    <select id="role" name="role" required>
+      <option value="student" selected>Student</option>
+      <option value="teacher">Teacher</option>
+      <option value="staff">Staff</option>
+    </select>
     <label for="username">Username</label>
     <input id="username" name="username" autocomplete="username" maxlength="20" required>
     <label for="email">Email (we send a confirmation link)</label>
@@ -23,7 +29,6 @@
     <div class="err" id="err" role="alert"></div>
     <div class="notice" id="notice" role="status"></div>
     <button class="post-btn">Sign up</button>
-    <p class="alt">Teacher or staff? Ask a moderator to create your account.</p>
     <p class="alt">Already have an account? <a href="login.html">Log in</a></p>
     <p class="alt"><a href="about.html">About &amp; terms</a></p>
   </form>
