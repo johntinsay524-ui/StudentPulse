@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Log in — Student Pulse</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="auth.css">
+</head>
+<body>
+<main class="authwrap">
+  <form class="card authcard" id="loginForm">
+    <h1>Student Pulse</h1>
+    <p class="sub">Log in to the student board</p>
+    <label for="username">Username</label>
+    <input id="username" name="username" autocomplete="username" required>
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required>
+    <div class="err" id="err" role="alert"></div>
+    <button class="post-btn">Log in</button>
+    <p class="alt">Forgot your password? Ask a moderator to reset it.</p>
+    <p class="alt">New here? <a href="signup.html">Create an account</a></p>
+    <p class="alt"><a href="about.html">About &amp; terms</a></p>
+  </form>
+</main>
+<script src="store.js"></script>
+<script src="auth.js"></script>
+<script src="auth-pages.js"></script>
+</body>
+</html>

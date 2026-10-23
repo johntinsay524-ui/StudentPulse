@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Student Pulse — Student Board</title>
+<link rel="stylesheet" href="style.css">
+<script src="store.js"></script>
+<script src="dialog.js"></script>
+<script src="auth.js"></script>
+<script>Auth.requireLogin();</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to the posts</a>
+
+<header class="top">
+  <h1>Student Pulse</h1>
+  <span style="color:var(--fa);font-size:12.5px">student board</span>
+  <div class="sp"></div>
+  <a href="profile.html" id="who" title="My profile" style="font-size:13px;text-decoration:none"></a>
+  <a href="admin.html" id="adminLink" hidden style="color:var(--gold);font-size:13px;text-decoration:none">Moderator page</a>
+  <button id="modBtn" hidden>Mod mode</button>
+  <button id="logoutBtn">Log out</button>
+</header>
+
+<div class="wrap">
+
+  <!-- LEFT: boards -->
+  <nav class="side" aria-label="Boards">
+    <h2>Boards</h2>
+    <div class="boards" id="boards" role="group" aria-label="Choose a board">
+      <button class="on" data-b="All">All</button>
+      <button data-b="Events">Events</button>
+      <button data-b="Campus life">Campus life</button>
+      <button data-b="Academics">Academics</button>
+      <button data-b="Facilities">Facilities</button>
+      <button data-b="Suggestions">Suggestions</button>
+    </div>
+  </nav>
+
+  <!-- MIDDLE: composer + feed -->
+  <main id="main" tabindex="-1">
+    <form class="card composer" id="form" aria-label="Write a post">
+      <input id="t" aria-label="Post title" placeholder="What's on your mind about school or an event?" maxlength="120" required>
+      <textarea id="b" aria-label="More details (optional)" placeholder="Tell us more (optional)"></textarea>
+      <div class="post-prev" id="postPrev" hidden><img alt="Preview of the photo you are adding"><button type="button" id="rmPostImg">Remove photo</button></div>
+      <div class="crow">
+        <select id="bd" aria-label="Board">
+          <option>Events</option>
+          <option>Campus life</option>
+          <option>Academics</option>
+          <option>Facilities</option>
+          <option>Suggestions</option>
+        </select>
+        <div class="moods" id="moods" role="group" aria-label="How are you feeling?">
+          <button type="button" class="mood" data-m="happy">😊 Happy</button>
+          <button type="button" class="mood on" data-m="meh">😐 Meh</button>
+          <button type="button" class="mood" data-m="stressed">😟 Stressed</button>
+          <button type="button" class="mood" data-m="upset">😠 Frustrated</button>
+        </div>
+      </div>
+      <div class="crow" style="margin-top:8px">
+        <label class="photo-btn">📷 Add photo<input type="file" id="postFile" accept="image/*" class="vh"></label>
+        <label class="anon"><input type="checkbox" id="an" style="width:auto;margin:0" aria-describedby="anonNote"> Post anonymously</label>
+        <div style="flex:1"></div>
+        <button class="post-btn">Post</button>
+      </div>
+      <p class="anonnote" id="anonNote" hidden>Anonymous means other students can't see you. Moderators can reveal the author only if it is reported for bullying, harassment or a threat.</p>
+    </form>
+
+    <div class="sort" id="sort" role="group" aria-label="Sort posts">
+      <button class="on" data-s="new">Newest</button>
+      <button data-s="top">Top</button>
+      <button data-s="talk">Most comments</button>
+    </div>
+
+    <div id="feed">
+      <div class="empty" id="empty" hidden>Nothing here yet. Be the first to post!</div>
+    </div>
+  </main>
+
+  <!-- RIGHT: mood + rules -->
+  <aside class="rail" aria-label="School mood and board rules">
+    <div class="card">
+      <h2>School mood</h2>
+      <div id="moodStats" role="group" aria-label="Number of posts by mood">
+        <div class="bar" data-m="happy"><span>😊 Happy</span><i></i><em>0</em></div>
+        <div class="bar" data-m="meh"><span>😐 Meh</span><i></i><em>0</em></div>
+        <div class="bar" data-m="stressed"><span>😟 Stressed</span><i></i><em>0</em></div>
+        <div class="bar" data-m="upset"><span>😠 Frustrated</span><i></i><em>0</em></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Board rules</h2>
+      <ol class="rules">
+        <li>Be honest, be kind.</li>
+        <li>Criticize ideas and policies, not people.</li>
+        <li>No names in complaints.</li>
+        <li>Tag spoilers and sensitive stuff.</li>
+        <li>Anonymous isn't untraceable: moderators can reveal the author of a post or comment reported for bullying, harassment or threats.</li>
+      </ol>
+    </div>
+  </aside>
+
+</div>
+
+<p class="foot"><a href="about.html">About, privacy &amp; terms</a><button type="button" id="welcomeBtn">Show the welcome guide</button></p>
+
+<!-- Templates used by script.js when someone makes a new post or comment -->
+<template id="post-tpl">
+  <article class="card post" data-id="" data-board="" data-mood="">
+    <div class="pb">
+      <div class="meta"><span class="b"></span> · <span class="n"></span> · just now<span class="tag"></span></div>
+      <h2></h2>
+      <p></p>
+      <div class="acts">
+        <button data-a="cm">💬 <span class="cm-count">0</span> comments</button>
+        <button data-a="rp">Report</button>
+        <button class="dng remove" data-a="rm">Remove</button>
+      </div>
+      <div class="cmts" hidden>
+        <div class="cm-list"></div>
+        <form class="cm-form"><input class="cm-text" aria-label="Add a comment" placeholder="Add a comment"><label class="photo-btn" title="Add a photo">📷<input type="file" class="cm-file vh" accept="image/*" aria-label="Add a photo to your comment"></label><label class="anon cm-anon" title="Other students will not see your name"><input type="checkbox" class="cm-an"> Anonymous</label><button>Reply</button><div class="cm-prev" hidden><img alt="Preview of the photo you are adding"><button type="button" class="cm-rm">Remove photo</button></div></form>
+      </div>
+    </div>
+  </article>
+</template>
+
+<template id="cm-tpl">
+  <div class="cm"><span class="n"></span><br><span class="txt"></span></div>
+</template>
+
+<script src="images.js"></script>
+<script src="script.js"></script>
+<script src="welcome.js"></script>
+<script src="extras.js"></script>
+</body>
+</html>

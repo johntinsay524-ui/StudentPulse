@@ -1,0 +1,12 @@
+.authwrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.authcard{width:100%;max-width:380px;padding:28px}
+.authcard h1{font:700 26px var(--serif);margin:0 0 4px;color:var(--gold)}
+.authcard{border-top:4px solid var(--maroon)}
+.authcard .sub{color:var(--mu);margin:0 0 20px;font-size:13.5px}
+.authcard label{display:block;font-size:12.5px;color:var(--fa);margin:0 0 4px}
+.authcard input{width:100%;background:var(--bg);border:1px solid var(--bd);border-radius:4px;padding:9px 10px;margin-bottom:14px}
+.authcard input:focus-visible{outline:2px solid var(--gold);outline-offset:-1px}
+.authcard .post-btn{width:100%;padding:10px}
+.err{color:var(--red);font-size:13px;min-height:20px;margin-bottom:8px}
+.alt{text-align:center;color:var(--mu);font-size:13px;margin:16px 0 0}
+.alt a{color:var(--gold)}

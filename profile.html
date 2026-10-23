@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Profile — Student Pulse</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="profile.css">
+<script src="store.js"></script>
+<script src="dialog.js"></script>
+<script src="auth.js"></script>
+<script>Auth.requireLogin();</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to the profile</a>
+
+<header class="top">
+  <h1>Student Pulse</h1>
+  <span>profile</span>
+  <div class="sp"></div>
+  <a href="index.html" style="font-size:13px;text-decoration:none">&larr; Back to the board</a>
+  <button id="logoutBtn">Log out</button>
+</header>
+
+<main class="pwrap" id="main" tabindex="-1">
+
+  <section class="card pcard" id="pcard">
+    <div class="avatar" id="avatar" role="img" aria-label="Profile photo"></div>
+    <div class="pinfo">
+      <h2 id="pname"></h2>
+      <div class="pmeta"><span class="rolepill" id="prole"></span><span id="pjoined"></span></div>
+      <p class="bio" id="pbio"></p>
+      <button class="ghost" id="editBtn" hidden>Edit profile</button>
+    </div>
+  </section>
+
+  <form class="card pedit" id="editForm" hidden>
+    <label for="dispIn">Display name <span class="hint">(shown on your posts and comments; leave blank to use your username)</span></label>
+    <input id="dispIn" maxlength="30" placeholder="e.g. Alex M.">
+    <label for="bioIn">Bio <span class="hint">(up to 160 characters)</span></label>
+    <textarea id="bioIn" maxlength="160" placeholder="Tell other students a little about yourself"></textarea>
+    <div class="avrow">
+      <label class="photo-btn">📷 Change profile photo<input type="file" id="avFile" accept="image/*" class="vh"></label>
+      <button type="button" class="ghost" id="avRemove">Remove photo</button>
+      <div class="avatar small" id="avPreview" role="img" aria-label="Profile photo preview"></div>
+    </div>
+    <div class="err" id="err" role="alert"></div>
+    <div class="btns"><button class="post-btn">Save</button><button type="button" class="ghost" id="cancelBtn">Cancel</button></div>
+  </form>
+
+  <section class="card pedit" id="acct" hidden>
+    <h2 class="ptitle" style="margin-top:0">Account settings</h2>
+    <form id="nameForm">
+      <label for="newName">New username <span class="hint">(3–20 letters, numbers or underscores)</span></label>
+      <input id="newName" maxlength="20" autocomplete="off" required>
+      <label for="namePw">Current password</label>
+      <input id="namePw" type="password" autocomplete="current-password" required>
+      <div class="err" id="nameErr" role="alert"></div>
+      <button class="post-btn">Change username</button>
+    </form>
+    <form id="passForm" class="sect">
+      <h3>Change password</h3>
+      <label for="oldPw">Current password</label>
+      <input id="oldPw" type="password" autocomplete="current-password" required>
+      <label for="newPw">New password <span class="hint">(8+ characters)</span></label>
+      <input id="newPw" type="password" autocomplete="new-password" required>
+      <label for="newPw2">Confirm new password</label>
+      <input id="newPw2" type="password" autocomplete="new-password" required>
+      <div class="err" id="passErr" role="alert"></div>
+      <div class="okmsg" id="passOk" role="status"></div>
+      <button class="post-btn">Change password</button>
+    </form>
+    <form id="delForm" class="danger">
+      <h3>Delete account</h3>
+      <p>This cannot be undone. Your profile is removed and your posts and comments stay on the board as “Anonymous”.</p>
+      <label for="delPw">Enter your password to confirm</label>
+      <input id="delPw" type="password" autocomplete="current-password" required>
+      <div class="err" id="delErr" role="alert"></div>
+      <button class="post-btn dangerbtn">Delete my account</button>
+    </form>
+  </section>
+
+  <div class="pstats" id="pstats">
+    <div><b id="nPosts">0</b><span>posts</span></div>
+    <div><b id="nCm">0</b><span>comments</span></div>
+  </div>
+
+  <h2 class="ptitle" id="ptitle">Posts</h2>
+  <div id="plist"></div>
+  <div class="empty" id="pempty" hidden></div>
+
+  <div class="card notfound" id="nf" hidden>
+    <p>We couldn't find that student.</p>
+    <a href="index.html">Back to the board</a>
+  </div>
+</main>
+
+<script src="images.js"></script>
+<script src="profile.js"></script>
+</body>
+</html>
