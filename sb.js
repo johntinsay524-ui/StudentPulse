@@ -30,8 +30,9 @@ const SB = (() => {
       if (!/^\S+@\S+\.\S+$/.test(email)) return { error: 'Enter a valid email address.' };
       if (pw.length < 8) return { error: 'Password must be at least 8 characters.' };
       if (pw !== pw2) return { error: 'Passwords do not match.' };
-      const { data: free } = await sb.rpc('username_free', { n: name });
-      if (!free) return { error: 'That username is taken.' };
+      const { data: free, error: freeErr } = await sb.rpc('username_free', { n: name });
+      if (freeErr) return { error: 'Could not check the username: ' + freeErr.message };
+      if (free === false) return { error: 'That username is taken.' };
       const { data, error } = await sb.auth.signUp({ email, password: pw, options: { data: { username: name }, emailRedirectTo: new URL('login.html', location.href).href } });
       if (error) return { error: error.message };
       if (data.session) return finish();   // only if confirmation is switched off in Supabase
