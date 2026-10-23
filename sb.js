@@ -43,6 +43,71 @@ const SB = (() => {
       if (data.session) return finish();   // only if confirmation is switched off in Supabase
       return { sent: true, email, notice: 'Almost done! We sent a confirmation link to ' + email + '. Open it, then come back here and log in.' };
     },
-    logout: async () => { await sb.auth.signOut(); }
+    logout: async () => { await sb.auth.signOut(); },
+
+    // Moderators only: create a real Supabase account (email + password) so the person can log in.
+    // Uses public signUp (email confirmation stays on — recommended). Does not leave you logged in as the new user.
+    async createAccount(name, email, pw, role) {
+      name = String(name || '').trim();
+      email = String(email || '').trim().toLowerCase();
+      role = ['student', 'teacher', 'staff', 'moderator'].includes(role) ? role : 'student';
+      if (!/^[A-Za-z0-9_]{3,20}$/.test(name)) return { error: 'Username must be 3–20 letters, numbers or underscores.' };
+      if (!/^\S+@\S+\.\S+$/.test(email)) return { error: 'Enter a valid email address.' };
+      const generated = !pw;
+      if (generated) {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+        pw = [...crypto.getRandomValues(new Uint8Array(10))].map(b => chars[b % chars.length]).join('');
+      } else if (String(pw).length < 8) {
+        return { error: 'Password must be at least 8 characters (or leave it blank to generate one).' };
+      }
+      const { data: free, error: freeErr } = await sb.rpc('username_free', { n: name });
+      if (freeErr) return { error: 'Could not check the username: ' + freeErr.message };
+      if (free === false) return { error: 'That username is taken.' };
+
+      // Role for the trigger: never create moderator via metadata (mod_set_role does that after)
+      const metaRole = role === 'moderator' ? 'student' : role;
+      const { data, error } = await sb.auth.signUp({
+        email,
+        password: pw,
+        options: { data: { username: name, role: metaRole }, emailRedirectTo: new URL('confirmed.html', location.href).href }
+      });
+      if (error) return { error: error.message };
+      if (data.user && data.user.identities && data.user.identities.length === 0) {
+        return { error: 'That email already has an account.' };
+      }
+
+      // If confirm-email is off, signUp logs you in as the new user — switch back out
+      let needRelogin = false;
+      if (data.session) {
+        await sb.auth.signOut();
+        needRelogin = true;
+      }
+
+      // Promote to the requested role when it is not the default from the trigger
+      if (role !== 'student') {
+        const { error: roleErr } = await sb.rpc('mod_set_role', { uname: name, new_role: role });
+        if (roleErr) {
+          // Account exists; role just could not be set yet (e.g. confirm-email still pending, or migration not run)
+          return {
+            ok: true, password: pw, generated, role: 'student', email, needRelogin,
+            notice: 'Account created as student. Role could not be set yet: ' + roleErr.message +
+              ' Run supabase-migration-mod-create.sql in the SQL Editor, then change the role on this page.'
+          };
+        }
+      }
+
+      // Keep the moderator Students table in sync (local bridge until admin is fully on Supabase)
+      let u = {}; try { u = JSON.parse(Store.get('studentpulse_users')) || {}; } catch {}
+      u[name.toLowerCase()] = {
+        ...(u[name.toLowerCase()] || {}),
+        name, role, joined: Date.now(), bio: '', avatar: '', salt: 'x', hash: 'x'
+      };
+      Store.set('studentpulse_users', JSON.stringify(u));
+
+      return {
+        ok: true, password: pw, generated, role, email, needRelogin,
+        needsConfirm: !data.session
+      };
+    }
   };
 })();

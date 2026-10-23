@@ -9,6 +9,9 @@
 <script src="store.js"></script>
 <script src="word-filter.js"></script>
 <script src="dialog.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="supabase-config.js"></script>
+<script src="sb.js"></script>
 <script src="auth.js"></script>
 <script>Auth.requireMod();</script>
 </head>
@@ -82,9 +85,10 @@
       <h3 class="sec">Add an account</h3>
       <form class="card newacct" id="newAcctForm">
         <input name="username" placeholder="Username" aria-label="Username (3–20 letters, numbers or underscores)" title="3–20 letters, numbers or underscores" maxlength="20" autocomplete="off" required>
+        <input name="email" type="email" placeholder="Email" aria-label="Email address (they log in with this)" autocomplete="off" required>
         <input name="password" placeholder="Password (blank = generate)" aria-label="Temporary password, leave blank to generate one" autocomplete="off">
         <select name="role" aria-label="Role"><option value="student">Student</option><option value="teacher">Teacher</option><option value="staff">Staff</option><option value="moderator">Moderator</option></select>
-        <button class="post-btn">Create account</button>
+        <button type="submit" class="post-btn">Create account</button>
         <div class="err" id="newAcctErr" role="alert"></div>
       </form>
       <h3 class="sec">Students</h3>

@@ -277,20 +277,35 @@ document.addEventListener('click', async e => {
   render();
 });
 
-// Create an account for a student (or another moderator)
+// Create a real Supabase account (email + password) so the person can log in
 $('#newAcctForm').addEventListener('submit', async e => {
   e.preventDefault();
   const f = e.target.elements, err = $('#newAcctErr');
   err.textContent = '';
-  const role = f.role.value, name = f.username.value.trim();
+  const role = f.role.value, name = f.username.value.trim(), email = f.email.value.trim();
   if (role === 'moderator' && !await UI.confirm('Moderators can warn, ban and see every report.', { title: 'Create a moderator account for ' + name + '?', ok: 'Create moderator' })) return;
-  const res = await Auth.createAccount(name, f.password.value, role);
-  if (res.error) { err.textContent = res.error; return; }
-  Mod.log(me.name, 'created a ' + res.role + ' account for ' + name);
-  e.target.reset();
-  render();
-  await UI.alert(res.generated ? 'Give them this temporary password privately and ask them to change it on their profile page.' : 'Give them the password you chose privately and ask them to change it on their profile page.',
-    { title: 'Account created for ' + name + ' (' + res.role + ')', password: res.generated ? res.password : undefined });
+  const btn = e.target.querySelector('button[type="submit"]');
+  if (btn) btn.disabled = true;
+  try {
+    const res = await SB.createAccount(name, email, f.password.value, role);
+    if (res.error) { err.textContent = res.error; return; }
+    Mod.log(me.name, 'created a ' + res.role + ' account for ' + name + ' (' + email + ')');
+    e.target.reset();
+    render();
+    const lines = [];
+    if (res.generated) lines.push('Temporary password (give it to them privately):');
+    else lines.push('They log in with the password you chose. Ask them to change it on their profile page.');
+    if (res.needsConfirm) lines.push('A confirmation link was sent to ' + email + '. They must open it before they can log in.');
+    if (res.notice) lines.push(res.notice);
+    if (res.needRelogin) lines.push('Your moderator session was interrupted (email confirmation is off in Supabase). Log in again.');
+    await UI.alert(lines.join('\n\n'), {
+      title: 'Account created for ' + name + ' (' + res.role + ')',
+      password: res.generated ? res.password : undefined
+    });
+    if (res.needRelogin) location.replace('login.html');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 });
 
 // Word filter: add a word, switch on/off, test a sentence
