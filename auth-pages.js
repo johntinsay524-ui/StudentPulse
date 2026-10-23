@@ -5,7 +5,6 @@ const go = role => location.replace(role === 'moderator' ? 'admin.html' : 'index
 const skipIfLoggedIn = () => { const s = Auth.session(); if (s) go(s.role); };
 skipIfLoggedIn();
 window.addEventListener('pageshow', skipIfLoggedIn);
-Auth.seed();
 
 function wire(formId, action) {
   const form = document.getElementById(formId);
@@ -19,5 +18,5 @@ function wire(formId, action) {
     if (res.error) err.textContent = res.error; else go(res.role);
   });
 }
-wire('loginForm',  f => Auth.login(f.get('username'), f.get('password')));
-wire('signupForm', f => Auth.signup(f.get('username'), f.get('password'), f.get('confirm')));
+wire('loginForm',  f => SB.login(f.get('username'), f.get('password')));
+wire('signupForm', f => SB.signup(f.get('username'), f.get('password'), f.get('confirm')));
