@@ -297,3 +297,5 @@ img,video{max-width:100%}
 .rpmenu .rpsend:disabled{opacity:.6}
 .rpmenu .rpcancel{border-radius:6px;min-height:40px;padding:8px 16px}
 .rpmenu .rpcancel:hover{border-color:var(--mu);color:var(--tx)}
+
+.pb > a,.cm > a{display:block;width:fit-content;max-width:100%}
