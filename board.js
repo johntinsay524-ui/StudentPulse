@@ -16,7 +16,9 @@ function who(x) {
   return [av(x.author, x.author_avatar), n, x.author_role && x.author_role !== 'student' ? h('span', { class: 'rb r-' + x.author_role }, Auth.roleLabel(x.author_role)) : null];
 }
 function reportMenu(anchor, p, c) {
-  if (anchor.nextElementSibling && anchor.nextElementSibling.classList.contains('rpmenu')) return anchor.nextElementSibling.remove();
+  const isCm = anchor.classList.contains('cm');
+  const old = isCm ? anchor.querySelector(':scope > .rpmenu') : (anchor.nextElementSibling && anchor.nextElementSibling.classList.contains('rpmenu') ? anchor.nextElementSibling : null);
+  if (old) return old.remove();
   const err = h('div', { class: 'uierr', role: 'alert' });
   const opts = REASONS.map(r => h('label', { class: 'rpopt' }, h('input', { type: 'checkbox', value: r }), r));
   const send = h('button', { type: 'button', class: 'post-btn rpsend', onclick: async () => {
@@ -33,7 +35,7 @@ function reportMenu(anchor, p, c) {
     h('span', { class: 'rptitle' }, 'Why are you reporting this? Choose all that apply.'),
     h('div', { class: 'rpopts' }, opts), err,
     h('div', { class: 'rpbtns' }, send, h('button', { type: 'button', class: 'rpcancel', onclick: () => menu.remove() }, 'Cancel')));
-  anchor.after(menu);
+  isCm ? anchor.appendChild(menu) : anchor.after(menu);
   opts[0].querySelector('input').focus();
 }
 async function sendComment(p, form) {
@@ -122,11 +124,9 @@ $('#logoutBtn').addEventListener('click', logout);
   const { data: { session } } = await sb.auth.getSession(); if (!session) return Auth.logout();
   const [{ data: p }, { data: st }] = await Promise.all([sb.from('profiles').select('*').eq('id', session.user.id).single(), sb.from('standing').select('*').eq('user_id', session.user.id).single()]);
   if (!p || (st && st.banned)) return logout();
-  me = p; $('#who').textContent = p.display || p.username; $('#who').prepend(av(p.username, p.avatar)); if (p.role === 'moderator') { $('#adminLink').hidden = false; $('#modBtn').hidden = false; }
-  if (st && st.warns) document.body.prepend(h('div', { class: 'storewarn' }, 'A moderator has warned you ' + st.warns + (st.warns === 1 ? ' time' : ' times') + '. Please follow the board rules.'));
-  await load();
+  me = p; $('#who').textContent = p.display || p.username; $('#who').prepend(av(p.username, p.avatar));
   if (p.role === 'moderator') { $('#adminLink').hidden = false; $('#modBtn').hidden = false; }
   if (st && st.warns) document.body.prepend(h('div', { class: 'storewarn' }, 'A moderator has warned you ' + st.warns + (st.warns === 1 ? ' time' : ' times') + '. Please follow the board rules.'));
   await load();
-  setInterval(() => { if (!document.hidden && !$$('#feed input[type=text],#feed .cm-text,#feed textarea,#feed .rpmenu').some(i => i.value || i === document.activeElement || i.classList.contains('rpmenu'))) load(); }, 20000);   // pick up other students' posts   // pick up other students' posts
+  setInterval(() => { if (!document.hidden && !$$('#feed input[type=text],#feed .cm-text,#feed textarea,#feed .rpmenu').some(i => i.value || i === document.activeElement || i.classList.contains('rpmenu'))) load(); }, 20000);   // pick up other students' posts
 })();
