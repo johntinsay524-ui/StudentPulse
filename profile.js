@@ -2,7 +2,7 @@ const $ = s => document.querySelector(s);
 const MOODS = { happy: '😊 Happy', meh: '😐 Meh', stressed: '😟 Stressed', upset: '😠 Frustrated' };
 const ago = t => { const m = Math.round((Date.now() - new Date(t)) / 6e4); return m < 1 ? 'just now' : m < 60 ? m + 'm ago' : m < 1440 ? Math.round(m / 60) + 'h ago' : Math.round(m / 1440) + 'd ago'; };
 
-let authUser, prof = null, own = false, newAvatar = null;   // newAvatar: null = unchanged, '' = remove, else data URL
+let authUser, prof = null, own = false, newAvatar = null, newAvatarFile = null;   // newAvatar: null = unchanged, '' = remove, else data URL
 const form = $('#editForm');
 
 $('#logoutBtn').addEventListener('click', async () => { await sb.auth.signOut(); Auth.logout(); });
@@ -51,7 +51,7 @@ async function renderPosts() {
     card.appendChild(m);
     const h = document.createElement('h3'); h.textContent = p.title; card.appendChild(h);
     if (p.body) { const bp = document.createElement('p'); bp.textContent = p.body; card.appendChild(bp); }
-    if (p.image) { const im = document.createElement('img'); im.className = 'pimg'; im.src = p.image; im.alt = 'Photo attached to the post'; card.appendChild(im); }
+    if (p.image) { const im = document.createElement('img'); im.className = 'pimg'; im.src = thumbOf(p.image); im.loading = 'lazy'; im.alt = 'Photo attached to the post'; card.appendChild(im); }
     const c = document.createElement('div'); c.className = 'meta'; c.textContent = '💬 ' + (per[p.id] || 0) + ' comments';
     card.appendChild(c);
     list.appendChild(card);
@@ -63,7 +63,7 @@ async function renderPosts() {
 
 // ---- editing your own profile ----
 $('#editBtn').addEventListener('click', () => {
-  newAvatar = null;
+  newAvatar = null; newAvatarFile = null;
   $('#bioIn').value = prof.bio;
   $('#dispIn').value = prof.display === prof.name ? '' : prof.display;
   setAvatar($('#avPreview'), prof.avatar, prof.name);
@@ -74,11 +74,11 @@ $('#cancelBtn').addEventListener('click', () => { form.hidden = true; $('#editBt
 
 $('#avFile').addEventListener('change', async e => {
   const file = e.target.files[0]; if (!file) return;
-  try { newAvatar = await readImage(file, { max: 256, quality: 0.8, square: true }); setAvatar($('#avPreview'), newAvatar, prof.name); $('#err').textContent = ''; }
+  try { newAvatar = await readImage(file, { max: 160, quality: 0.8, square: true }); newAvatarFile = file; setAvatar($('#avPreview'), newAvatar, prof.name); $('#err').textContent = ''; }
   catch (err) { $('#err').textContent = err.message; }
   e.target.value = '';
 });
-$('#avRemove').addEventListener('click', () => { newAvatar = ''; setAvatar($('#avPreview'), '', prof.name); });
+$('#avRemove').addEventListener('click', () => { newAvatar = ''; newAvatarFile = null; setAvatar($('#avPreview'), '', prof.name); });
 
 form.addEventListener('submit', async e => {
   e.preventDefault();
@@ -87,9 +87,16 @@ form.addEventListener('submit', async e => {
   if (disp.toLowerCase() === 'anonymous') { err.textContent = 'That name is already used by someone else.'; return; }
   // blank (or same as the username) is stored as NULL, because display names must be unique
   const patch = { bio: $('#bioIn').value.trim().slice(0, 160), display: disp && disp.toLowerCase() !== prof.name.toLowerCase() ? disp : null };
-  if (newAvatar !== null) patch.avatar = newAvatar;
+  const oldAvatar = prof.avatar;
+  if (newAvatar === '') patch.avatar = '';
+  else if (newAvatar && newAvatarFile) {
+    try { patch.avatar = await uploadImage(newAvatarFile, { kind: 'a', thumb: false, max: 160, square: true, quality: 0.8 }); }
+    catch (x) { err.textContent = x.message; return; }
+  }
   const { error } = await sb.from('profiles').update(patch).eq('id', authUser.id);
-  if (error) { err.textContent = error.code === '23505' ? 'That name is already used by someone else.' : error.message; return; }
+  if (error) {
+    if (patch.avatar) dropImage(patch.avatar, false); err.textContent = error.code === '23505' ? 'That name is already used by someone else.' : error.message; return; }
+  if (patch.avatar !== undefined && oldAvatar && oldAvatar !== patch.avatar) dropImage(oldAvatar, false);
   const { data } = await sb.from('profiles').select('*').eq('id', authUser.id).single();
   prof = shape(data);
   form.hidden = true;
