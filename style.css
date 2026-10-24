@@ -299,3 +299,7 @@ img,video{max-width:100%}
 .rpmenu .rpcancel:hover{border-color:var(--mu);color:var(--tx)}
 
 .pb > a,.cm > a{display:block;width:fit-content;max-width:100%}
+
+.morebtn{display:block;margin:6px auto 20px;background:none;border:1px solid var(--bd);border-radius:20px;padding:9px 22px;min-height:40px;color:var(--mu)}
+.morebtn:hover:not(:disabled){color:var(--tx);border-color:var(--mu)}
+.morebtn:disabled{opacity:.6}
