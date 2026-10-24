@@ -206,16 +206,31 @@ $('#form').addEventListener('submit', async e => {
 const logout = async () => { await sb.auth.signOut(); Auth.logout(); };
 $('#logoutBtn').addEventListener('click', logout);
 
+// Warnings and bans: shown to the student as soon as they open the board, and re-checked every 30 seconds
+async function checkStanding() {
+  const { data } = await sb.rpc('my_standing'); if (!data) return;
+  if (data.banned) { await UI.alert('A moderator has banned this account, so you can no longer use the board.', { title: 'Account banned' }); return logout(); }
+  let bar = $('#warnbar');
+  if (data.warns) {
+    if (!bar) { bar = h('div', { class: 'storewarn', id: 'warnbar' }); document.body.prepend(bar); }
+    bar.textContent = 'A moderator has warned you ' + data.warns + (data.warns === 1 ? ' time' : ' times') + '. Please follow the board rules.';
+  } else if (bar) bar.remove();
+  const key = 'sp_warns_seen_' + me.id, seen = +(Store.get(key) || 0);
+  Store.set(key, String(data.warns));
+  if (data.warns > seen) UI.alert('A moderator has warned you' + (data.reason ? ': ' + data.reason : '.') + ' Please follow the board rules. If you think this is a mistake, speak to a moderator.', { title: 'You have received a warning' });
+}
+
 (async () => {   // start: who is logged in, and are they allowed in?
   const { data: { session } } = await sb.auth.getSession(); if (!session) return Auth.logout();
   const [{ data: p }, { data: st }] = await Promise.all([sb.from('profiles').select('*').eq('id', session.user.id).single(), sb.from('standing').select('*').eq('user_id', session.user.id).single()]);
   if (!p || (st && st.banned)) return logout();
   me = p; $('#who').textContent = p.display || p.username; $('#who').prepend(av(p.username, p.avatar));
   if (p.role === 'moderator') { $('#adminLink').hidden = false; $('#modBtn').hidden = false; }
-  if (st && st.warns) document.body.prepend(h('div', { class: 'storewarn' }, 'A moderator has warned you ' + st.warns + (st.warns === 1 ? ' time' : ' times') + '. Please follow the board rules.'));
   await Promise.all([load(), loadMoods()]);
+  checkStanding();
   // Every 30 seconds, quietly pick up other students' activity (only the posts already on screen, plus any open comments)
   setInterval(async () => {
+    if (!document.hidden) checkStanding();
     if (document.hidden || $$('#feed input[type=text],#feed .cm-text,#feed textarea,#feed .rpmenu').some(i => i.value || i === document.activeElement || i.classList.contains('rpmenu'))) return;
     if (open.size) await loadComments([...open]);
     await load(false, Math.max(posts.length, PAGE)); loadMoods();

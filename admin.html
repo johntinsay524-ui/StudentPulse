@@ -6,13 +6,10 @@
 <title>Student Pulse — Moderator</title>
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="admin.css">
-<script src="store.js?v=2"></script>
-<script src="word-filter.js?v=2"></script>
-<script src="dialog.js?v=2"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="supabase-config.js?v=3"></script>
-<script src="sb.js?v=3"></script>
-<script src="auth.js?v=3"></script>
+<script src="store.js"></script>
+<script src="word-filter.js"></script>
+<script src="dialog.js"></script>
+<script src="auth.js"></script>
 <script>Auth.requireMod();</script>
 </head>
 <body class="admin">
@@ -61,11 +58,6 @@
         <div id="chart"></div>
         <ul class="legend" id="legend"></ul>
         <details class="chartdata"><summary>View the numbers</summary><div id="chartTable"></div></details>
-        <div class="samplebar">
-          <button type="button" class="lo" id="sampleAdd">Add sample data</button>
-          <button type="button" class="lo" id="sampleRemove">Remove sample data</button>
-          <span class="hint">Sample posts spread over three weeks make this chart easy to demonstrate. Posts made before dates were saved are not shown.</span>
-        </div>
       </div>
 
       <h3 class="sec">Recent moderation activity</h3>
@@ -82,16 +74,8 @@
 
     <!-- STUDENTS -->
     <section class="panel" id="students" role="tabpanel" aria-labelledby="tab-students">
-      <h3 class="sec">Add an account</h3>
-      <form class="card newacct" id="newAcctForm">
-        <input name="username" placeholder="Username" aria-label="Username (3–20 letters, numbers or underscores)" title="3–20 letters, numbers or underscores" maxlength="20" autocomplete="off" required>
-        <input name="email" type="email" placeholder="Email" aria-label="Email address (they log in with this)" autocomplete="off" required>
-        <input name="password" placeholder="Password (blank = generate)" aria-label="Temporary password, leave blank to generate one" autocomplete="off">
-        <select name="role" aria-label="Role"><option value="student">Student</option><option value="teacher">Teacher</option><option value="staff">Staff</option><option value="moderator">Moderator</option></select>
-        <button type="submit" class="post-btn">Create account</button>
-        <div class="err" id="newAcctErr" role="alert"></div>
-      </form>
       <h3 class="sec">Students</h3>
+      <p class="hint" style="margin:0 0 12px">Everyone who signs up appears here with their profile picture, display name and username.</p>
       <table class="tbl">
         <thead><tr><th scope="col">Student</th><th scope="col">Role</th><th scope="col">Joined</th><th scope="col">Posts</th><th scope="col">Status</th><th scope="col"><span class="vh">Actions</span></th></tr></thead>
         <tbody id="studentBody"></tbody>
@@ -101,7 +85,7 @@
     <!-- WORD FILTER -->
     <section class="panel" id="filter" role="tabpanel" aria-labelledby="tab-filter">
       <h3 class="sec">Banned words and phrases</h3>
-      <p class="hint" style="margin:0 0 12px">Students cannot post, comment or save a profile that contains a word on this list (whole words only, capital letters and accents are ignored). Moderators are exempt. Add teacher names here to enforce the "no names in complaints" rule.</p>
+      <p class="hint" style="margin:0 0 12px">Students cannot post, comment or save a profile that contains a word on this list (whole words only, capital letters are ignored). Moderators are exempt. Add teacher names here to enforce the "no names in complaints" rule.</p>
       <label class="onoff"><input type="checkbox" id="filterOn"> Filter is on</label>
       <form class="card newacct" id="wordForm">
         <input name="word" aria-label="Word or phrase to block" placeholder="Word or phrase to block" maxlength="40" autocomplete="off" required>
@@ -125,7 +109,10 @@
     </section>
   </main>
 </div>
-<script src="admin.js?v=9"></script>
-<script src="extras.js?v=2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="supabase-config.js"></script>
+<script src="sb.js"></script>
+<script src="admin.js"></script>
+<script src="extras.js"></script>
 </body>
 </html>
