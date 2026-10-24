@@ -1,30 +1,20 @@
 const $ = s => document.querySelector(s);
+const MOODS = { happy: '😊 Happy', meh: '😐 Meh', stressed: '😟 Stressed', upset: '😠 Frustrated' };
+const ago = t => { const m = Math.round((Date.now() - new Date(t)) / 6e4); return m < 1 ? 'just now' : m < 60 ? m + 'm ago' : m < 1440 ? Math.round(m / 60) + 'h ago' : Math.round(m / 1440) + 'd ago'; };
 
-const me = Auth.session();
-const wanted = new URLSearchParams(location.search).get('user') || me.name;
-let prof = Auth.profile(wanted);
-// Sample authors on the board (no account) still get a simple profile
-if (!prof && wanted !== 'Anonymous') {
-  const doc = new DOMParser().parseFromString(Store.get('studentpulse_feed_v2') || '', 'text/html');
-  if ([...doc.querySelectorAll('.meta .n, .cm .n')].some(n => n.textContent === wanted))
-    prof = { name: wanted, role: 'student', bio: '', avatar: '', joined: null };
-}
-if (prof && !prof.display) prof.display = prof.name;
-const own = !!prof && prof.name.toLowerCase() === me.name.toLowerCase();
+let authUser, prof = null, own = false, newAvatar = null;   // newAvatar: null = unchanged, '' = remove, else data URL
+const form = $('#editForm');
 
-$('#logoutBtn').addEventListener('click', Auth.logout);
+$('#logoutBtn').addEventListener('click', async () => { await sb.auth.signOut(); Auth.logout(); });
+
+const verify = async pw => !(await sb.auth.signInWithPassword({ email: authUser.email, password: pw })).error;
 
 function setAvatar(el, url, name) {
   el.textContent = '';
-  if (url) {
-    const img = document.createElement('img');
-    img.src = url;
-    img.alt = name + "'s profile photo";
-    el.appendChild(img);
-  } else {
-    el.textContent = name[0].toUpperCase();
-  }
+  if (url) { const img = document.createElement('img'); img.src = url; img.alt = name + "'s profile photo"; el.appendChild(img); }
+  else el.textContent = name[0].toUpperCase();
 }
+const shape = r => r && { name: r.username, display: r.display || r.username, role: r.role, bio: r.bio || '', avatar: r.avatar || '', joined: r.joined };
 
 function renderHeader() {
   document.title = prof.display + ' — Student Pulse';
@@ -40,137 +30,123 @@ function renderHeader() {
   $('#ptitle').textContent = own ? 'Your posts' : prof.display + "'s posts";
 }
 
-// Posts and comments are read from the board's saved data.
-// Anonymous posts show as "Anonymous" there, so they never appear on anyone's profile.
-function renderPosts() {
-  const html = Store.get('studentpulse_feed_v2') || '';
-  const doc = new DOMParser().parseFromString(html, 'text/html');
-  const mine = [...doc.querySelectorAll('.post')]
-    .filter(p => (p.querySelector('.meta .n') || {}).textContent === prof.name)
-    .sort((a, b) => b.dataset.id - a.dataset.id);
-  const comments = [...doc.querySelectorAll('.cm .n')].filter(n => n.textContent === prof.name).length;
-
+// Anonymous posts have no author in posts_public, so they never show on a profile.
+async function renderPosts() {
+  const [{ data: posts }, { count }] = await Promise.all([
+    sb.from('posts_public').select('*').eq('author', prof.name).order('id', { ascending: false }),
+    sb.from('comments_public').select('id', { count: 'exact', head: true }).eq('author', prof.name)
+  ]);
+  const mine = posts || [];
+  const per = {};
+  if (mine.length) ((await sb.from('comments_public').select('post_id').in('post_id', mine.map(p => p.id))).data || []).forEach(c => per[c.post_id] = (per[c.post_id] || 0) + 1);
   $('#nPosts').textContent = mine.length;
-  $('#nCm').textContent = comments;
+  $('#nCm').textContent = count || 0;
 
   const list = $('#plist');
   list.textContent = '';
   mine.forEach(p => {
-    const meta = p.querySelector('.meta').cloneNode(true);
-    meta.querySelector('.tag').remove();
-    const time = meta.textContent.split(' · ')[2] || '';
-    const card = document.createElement('article');
-    card.className = 'card pitem';
-
-    const m = document.createElement('div');
-    m.className = 'meta';
-    m.textContent = p.dataset.board + (time ? ' · ' + time.trim() : '') + ' · ';
-    const tag = document.createElement('span');
-    tag.textContent = p.querySelector('.tag').textContent;
-    m.appendChild(tag);
+    const card = document.createElement('article'); card.className = 'card pitem';
+    const m = document.createElement('div'); m.className = 'meta';
+    m.textContent = p.board + ' · ' + ago(p.created) + ' · ' + MOODS[p.mood];
     card.appendChild(m);
-
-    const h = document.createElement('h3');
-    h.textContent = p.querySelector('h2').textContent;
-    card.appendChild(h);
-
-    const body = p.querySelector('.pb > p');
-    if (body) { const bp = document.createElement('p'); bp.textContent = body.textContent; card.appendChild(bp); }
-
-    const pic = p.querySelector('.pimg');
-    if (pic) { const im = document.createElement('img'); im.className = 'pimg'; im.src = pic.getAttribute('src'); im.alt = 'Photo attached to the post'; card.appendChild(im); }
-
-    const c = document.createElement('div');
-    c.className = 'meta';
-    c.textContent = '💬 ' + p.querySelectorAll('.cm').length + ' comments';
+    const h = document.createElement('h3'); h.textContent = p.title; card.appendChild(h);
+    if (p.body) { const bp = document.createElement('p'); bp.textContent = p.body; card.appendChild(bp); }
+    if (p.image) { const im = document.createElement('img'); im.className = 'pimg'; im.src = p.image; im.alt = 'Photo attached to the post'; card.appendChild(im); }
+    const c = document.createElement('div'); c.className = 'meta'; c.textContent = '💬 ' + (per[p.id] || 0) + ' comments';
     card.appendChild(c);
     list.appendChild(card);
   });
-
   const empty = $('#pempty');
   empty.hidden = mine.length > 0;
   empty.textContent = own ? "You haven't posted yet. Share how school is going on the board!" : 'No posts yet.';
 }
 
-// Editing (only on your own profile)
-let newAvatar = null;           // null = unchanged, '' = remove photo, otherwise a data URL
-const form = $('#editForm');
-
+// ---- editing your own profile ----
 $('#editBtn').addEventListener('click', () => {
   newAvatar = null;
   $('#bioIn').value = prof.bio;
   $('#dispIn').value = prof.display === prof.name ? '' : prof.display;
   setAvatar($('#avPreview'), prof.avatar, prof.name);
   $('#err').textContent = '';
-  form.hidden = false;
-  $('#editBtn').hidden = true;
+  form.hidden = false; $('#editBtn').hidden = true;
 });
 $('#cancelBtn').addEventListener('click', () => { form.hidden = true; $('#editBtn').hidden = false; });
 
 $('#avFile').addEventListener('change', async e => {
-  const file = e.target.files[0];
-  if (!file) return;
-  try {
-    newAvatar = await readImage(file, { max: 256, quality: 0.8, square: true });
-    setAvatar($('#avPreview'), newAvatar, prof.name);
-    $('#err').textContent = '';
-  } catch (err) { $('#err').textContent = err.message; }
+  const file = e.target.files[0]; if (!file) return;
+  try { newAvatar = await readImage(file, { max: 256, quality: 0.8, square: true }); setAvatar($('#avPreview'), newAvatar, prof.name); $('#err').textContent = ''; }
+  catch (err) { $('#err').textContent = err.message; }
   e.target.value = '';
 });
 $('#avRemove').addEventListener('click', () => { newAvatar = ''; setAvatar($('#avPreview'), '', prof.name); });
 
-form.addEventListener('submit', e => {
+form.addEventListener('submit', async e => {
   e.preventDefault();
-  const disp = $('#dispIn').value.trim();
-  if (disp && disp.toLowerCase() !== prof.name.toLowerCase() && (disp.toLowerCase() === 'anonymous' || Auth.profile(disp))) {
-    $('#err').textContent = 'That name is already used by someone else.'; return;
-  }
-  const bad = Filter.check(disp + ' \n ' + $('#bioIn').value);
-  if (bad) { $('#err').textContent = Filter.message(bad); return; }
-  const patch = { bio: $('#bioIn').value.trim(), display: disp };
+  const disp = $('#dispIn').value.trim(), err = $('#err');
+  err.textContent = '';
+  if (disp.toLowerCase() === 'anonymous') { err.textContent = 'That name is already used by someone else.'; return; }
+  // blank (or same as the username) is stored as NULL, because display names must be unique
+  const patch = { bio: $('#bioIn').value.trim().slice(0, 160), display: disp && disp.toLowerCase() !== prof.name.toLowerCase() ? disp : null };
   if (newAvatar !== null) patch.avatar = newAvatar;
-  if (!Auth.updateProfile(patch)) { $('#err').textContent = 'Could not save. The browser may be out of space.'; return; }
-  prof = Auth.profile(prof.name);
+  const { error } = await sb.from('profiles').update(patch).eq('id', authUser.id);
+  if (error) { err.textContent = error.code === '23505' ? 'That name is already used by someone else.' : error.message; return; }
+  const { data } = await sb.from('profiles').select('*').eq('id', authUser.id).single();
+  prof = shape(data);
   form.hidden = true;
   renderHeader();
 });
 
-if (!prof) {
-  ['pcard', 'pstats', 'ptitle'].forEach(id => $('#' + id).hidden = true);
-  $('#nf').hidden = false;
-} else {
-  renderHeader();
-  renderPosts();
-}
-
-// Account settings (only on your own profile)
-if (own) {
-  $('#acct').hidden = false;
-  if (prof.role === 'moderator') $('#delForm').hidden = true;   // moderators can't delete themselves here
-}
-
+// ---- account settings ----
 $('#nameForm').addEventListener('submit', async e => {
   e.preventDefault();
-  $('#nameErr').textContent = '';
-  const res = await Auth.rename($('#newName').value, $('#namePw').value);
-  if (res.error) { $('#nameErr').textContent = res.error; return; }
-  location.replace('profile.html');   // reload so every page shows the new name
+  const err = $('#nameErr'); err.textContent = '';
+  if (!await verify($('#namePw').value)) { err.textContent = 'Wrong password.'; return; }
+  const n = $('#newName').value.trim();
+  const { error } = await sb.rpc('rename_me', { n });
+  if (error) { err.textContent = error.message; return; }
+  try { const s = JSON.parse(Store.get('studentpulse_session')); s.name = n; Store.set('studentpulse_session', JSON.stringify(s)); } catch {}
+  location.replace('profile.html');
 });
 
 $('#passForm').addEventListener('submit', async e => {
   e.preventDefault();
-  $('#passErr').textContent = ''; $('#passOk').textContent = '';
-  const res = await Auth.changePassword($('#oldPw').value, $('#newPw').value, $('#newPw2').value);
-  if (res.error) { $('#passErr').textContent = res.error; return; }
-  e.target.reset();
-  $('#passOk').textContent = 'Password changed.';
+  const err = $('#passErr'), ok = $('#passOk'); err.textContent = ''; ok.textContent = '';
+  const oldPw = $('#oldPw').value, a = $('#newPw').value, b = $('#newPw2').value;
+  if (a.length < 8) { err.textContent = 'New password must be at least 8 characters.'; return; }
+  if (a !== b) { err.textContent = 'New passwords do not match.'; return; }
+  if (a === oldPw) { err.textContent = 'Choose a password different from your current one.'; return; }
+  if (!await verify(oldPw)) { err.textContent = 'Wrong current password.'; return; }
+  const { error } = await sb.auth.updateUser({ password: a });
+  if (error) { err.textContent = error.message; return; }
+  e.target.reset(); ok.textContent = 'Password changed.';
 });
 
 $('#delForm').addEventListener('submit', async e => {
   e.preventDefault();
-  $('#delErr').textContent = '';
+  const err = $('#delErr'); err.textContent = '';
   if (!await UI.confirm('This cannot be undone. Your posts and comments stay on the board as “Anonymous”.', { title: 'Delete your account permanently?', ok: 'Delete my account', danger: true })) return;
-  const res = await Auth.deleteAccount($('#delPw').value);
-  if (res.error) { $('#delErr').textContent = res.error; return; }
+  if (!await verify($('#delPw').value)) { err.textContent = 'Wrong password.'; return; }
+  const { error } = await sb.rpc('delete_me');
+  if (error) { err.textContent = error.message; return; }
+  await sb.auth.signOut(); Store.remove('studentpulse_session');
   location.replace('login.html');
 });
+
+// ---- start ----
+(async () => {
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return Auth.logout();
+  authUser = user;
+  const { data: mineRow } = await sb.from('profiles').select('*').eq('id', user.id).single();
+  const wanted = new URLSearchParams(location.search).get('user');
+  let row = mineRow;
+  if (wanted && mineRow && wanted.toLowerCase() !== mineRow.username.toLowerCase())
+    row = (await sb.from('profiles').select('*').eq('username', wanted).maybeSingle()).data;
+  prof = shape(row);
+  own = !!prof && !!mineRow && row.id === mineRow.id;
+
+  if (!prof) { ['pcard', 'pstats', 'ptitle'].forEach(id => $('#' + id).hidden = true); $('#nf').hidden = false; return; }
+  renderHeader();
+  if (own) { $('#acct').hidden = false; if (prof.role === 'moderator') $('#delForm').hidden = true; }
+  renderPosts();
+})();

@@ -4,6 +4,7 @@ const h = (t, a = {}, ...k) => { const e = document.createElement(t); for (const
 const MOODS = { happy: '😊 Happy', meh: '😐 Meh', stressed: '😟 Stressed', upset: '😠 Frustrated' };
 const REASONS = ['Bullying', 'Harassment', 'Threat or safety concern', 'Spam', 'Off-topic', 'Names a teacher', 'Other'];
 const ago = t => { const m = Math.round((Date.now() - new Date(t)) / 6e4); return m < 1 ? 'just now' : m < 60 ? m + 'm ago' : m < 1440 ? Math.round(m / 60) + 'h ago' : Math.round(m / 1440) + 'd ago'; };
+const av = (name, url) => { const s = h('span', { class: 'av', 'data-name': name, 'aria-hidden': 'true' }); if (url) s.append(h('img', { src: url, alt: '' })); else s.textContent = name[0].toUpperCase(); return s; };
 const fail = e => e && UI.alert(e.message, { title: 'Please rephrase it' }) && true;
 let me, posts = [], rep = new Set(), board = 'All', sortBy = 'new', mood = 'meh', postImg = '';
 const open = new Set(), cImg = new Map();
@@ -12,7 +13,7 @@ const open = new Set(), cImg = new Map();
 function who(x) {
   if (x.anonymous || !x.author) return h('span', { class: 'n' }, 'Anonymous');
   const n = h('span', { class: 'n', role: 'link', tabindex: 0, 'data-user': x.author, title: 'View ' + x.author_display + '’s profile' }, x.author_display);
-  return [Auth.avatar(x.author), n, x.author_role && x.author_role !== 'student' ? h('span', { class: 'rb r-' + x.author_role }, Auth.roleLabel(x.author_role)) : null];
+  return [av(x.author, x.author_avatar), n, x.author_role && x.author_role !== 'student' ? h('span', { class: 'rb r-' + x.author_role }, Auth.roleLabel(x.author_role)) : null];
 }
 function reportMenu(anchor, p, c) {
   // Toggle closed if already open
@@ -134,7 +135,9 @@ $('#logoutBtn').addEventListener('click', logout);
   const { data: { session } } = await sb.auth.getSession(); if (!session) return Auth.logout();
   const [{ data: p }, { data: st }] = await Promise.all([sb.from('profiles').select('*').eq('id', session.user.id).single(), sb.from('standing').select('*').eq('user_id', session.user.id).single()]);
   if (!p || (st && st.banned)) return logout();
-  me = p; $('#who').textContent = p.display || p.username; $('#who').prepend(Auth.avatar(p.username));
+  me = p; $('#who').textContent = p.display || p.username; $('#who').prepend(av(p.username, p.avatar)); if (p.role === 'moderator') { $('#adminLink').hidden = false; $('#modBtn').hidden = false; }
+  if (st && st.warns) document.body.prepend(h('div', { class: 'storewarn' }, 'A moderator has warned you ' + st.warns + (st.warns === 1 ? ' time' : ' times') + '. Please follow the board rules.'));
+  await load();
   if (p.role === 'moderator') { $('#adminLink').hidden = false; $('#modBtn').hidden = false; }
   if (st && st.warns) document.body.prepend(h('div', { class: 'storewarn' }, 'A moderator has warned you ' + st.warns + (st.warns === 1 ? ' time' : ' times') + '. Please follow the board rules.'));
   await load();
