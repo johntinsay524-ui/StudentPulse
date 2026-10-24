@@ -39,3 +39,14 @@
 .okmsg{color:var(--grn);font-size:13px;min-height:20px;margin-bottom:6px}
 
 .dangerbtn{color:var(--onred)}
+
+@media(max-width:600px){
+  .pwrap{padding:14px 12px 40px}
+  .pcard{padding:18px}
+  .pstats{gap:20px}
+  .pedit{padding:14px}
+  .pedit input,.pedit textarea{min-height:44px}
+  .btns{flex-wrap:wrap}
+  .btns button,.pedit .post-btn{flex:1 1 auto;min-height:44px}
+  .avrow .photo-btn,.avrow .ghost{min-height:40px}
+}

@@ -211,3 +211,74 @@ body{font-size:16px}
 .mood,.photo-btn,.anon,.rpmenu,.rpmenu button{font-size:13.5px}
 .boards button.on,.sort button.on,.mood.on,
 .tabs .tab-btn.on,.chartbox .rangebar button.on{background:var(--opal);color:var(--onopal);border-color:var(--opal);font-weight:600}
+
+/* ================= MOBILE ================= */
+:root{padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+img,video{max-width:100%}
+
+@media(max-width:900px){
+  /* the real cause of sideways scrolling: 1fr can't shrink below its content */
+  .wrap{grid-template-columns:minmax(0,1fr);gap:14px;padding:14px 12px 40px}
+  .side,.rail,main{min-width:0}
+  .side h2{display:none}
+  .boards{gap:6px;padding-bottom:4px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .boards::-webkit-scrollbar{display:none}
+  .boards button{flex:0 0 auto;border:1px solid var(--bd);border-radius:20px;padding:8px 14px;min-height:40px}
+}
+
+@media(max-width:700px){
+  /* top bar: wraps instead of overflowing, and scrolls away to save screen space */
+  .top{flex-wrap:wrap;gap:8px 10px;padding:10px 12px;position:static}
+  .top h1{font-size:18px}
+  .top > span{display:none}
+  .top .sp{flex:1 1 0}
+  .top #who{max-width:55vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .top button{padding:8px 12px;min-height:40px}
+  .top a{padding:10px 0}
+}
+
+@media(max-width:600px){
+  body{font-size:15.5px}
+
+  /* posts */
+  .vote{width:40px}
+  .vote button{min-width:36px;min-height:36px}
+  .pb{padding:10px 12px}
+  .pb h2{font-size:17px;overflow-wrap:anywhere}
+  .pb p{overflow-wrap:anywhere;max-width:none}
+  .meta{line-height:1.8}
+  .acts{flex-wrap:wrap;gap:6px 14px}
+  .acts button,.cm-acts button,.rpmenu button,.sort button{min-height:38px}
+  .cm-acts{flex-wrap:wrap}
+  .cm{overflow-wrap:anywhere}
+  .cimg{max-width:100%}
+  .pimg{max-height:320px}
+  .sort{overflow-x:auto;scrollbar-width:none}
+  .sort button{flex:0 0 auto}
+
+  /* composer */
+  .composer{padding:12px}
+  .composer .crow select{width:100%}
+  .moods{flex:1 1 100%}
+  .mood{min-height:38px;padding:4px 12px}
+  .composer .crow > div[style]{display:none}      /* empty spacer */
+  .composer .post-btn{flex:1 1 100%;padding:11px}
+
+  /* comment box: text on its own row, buttons below it */
+  .cmts form{gap:8px}
+  .cmts .cm-text{flex:1 1 100%;min-width:0}
+  .cmts form button:not(.cm-rm){min-height:40px;padding:6px 16px}
+  .photo-btn{min-height:40px}
+
+  /* pop-ups */
+  .uibox{max-height:calc(100dvh - 40px);overflow:auto;padding:18px}
+  .uibtns{flex-wrap:wrap}
+  .uibtns button{flex:1 1 auto;min-height:42px}
+
+  /* login / sign-up */
+  .authwrap{align-items:flex-start;padding:16px}
+  .authcard{padding:22px 18px}
+  .authcard input,.authcard select{min-height:44px}
+  .authcard .post-btn{min-height:46px}
+}
+@supports(height:100dvh){.authwrap{min-height:100dvh}}
