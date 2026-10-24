@@ -282,3 +282,18 @@ img,video{max-width:100%}
   .authcard .post-btn{min-height:46px}
 }
 @supports(height:100dvh){.authwrap{min-height:100dvh}}
+
+/* multi-select report menu */
+.rpmenu{flex-direction:column;align-items:stretch;gap:8px;padding:12px;margin-top:8px;background:var(--rs);border:1px solid var(--bd);border-radius:8px}
+.rpmenu .rptitle{font-weight:600;color:var(--tx)}
+.rpopts{display:flex;flex-wrap:wrap;gap:8px}
+.rpopt{display:inline-flex;align-items:center;gap:8px;min-height:38px;padding:4px 12px;border:1px solid var(--bd);border-radius:20px;background:var(--sf);color:var(--mu);cursor:pointer;font-size:13.5px}
+.rpopt input{width:18px;height:18px;margin:0;accent-color:var(--gold)}
+.rpopt:has(input:checked){border-color:var(--gold);color:var(--gold);background:var(--gs);font-weight:600}
+.rpopt:has(input:focus-visible){outline:2px solid var(--gold);outline-offset:2px}
+.rpbtns{display:flex;gap:8px;flex-wrap:wrap}
+.rpmenu .rpsend{border-radius:6px;padding:8px 18px;min-height:40px;border:0;color:var(--ongold)}
+.rpmenu .rpsend:hover{border-color:transparent;color:var(--ongold)}
+.rpmenu .rpsend:disabled{opacity:.6}
+.rpmenu .rpcancel{border-radius:6px;min-height:40px;padding:8px 16px}
+.rpmenu .rpcancel:hover{border-color:var(--mu);color:var(--tx)}

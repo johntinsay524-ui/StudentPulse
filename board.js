@@ -16,38 +16,25 @@ function who(x) {
   return [av(x.author, x.author_avatar), n, x.author_role && x.author_role !== 'student' ? h('span', { class: 'rb r-' + x.author_role }, Auth.roleLabel(x.author_role)) : null];
 }
 function reportMenu(anchor, p, c) {
-  // Toggle closed if already open
-  if (anchor.classList.contains('cm')) {
-    const old = anchor.querySelector(':scope > .rpmenu');
-    if (old) { old.remove(); return; }
-  } else {
-    const next = anchor.nextElementSibling;
-    if (next && next.classList.contains('rpmenu')) { next.remove(); return; }
-  }
-  const menu = h('div', { class: 'rpmenu' }, h('span', {}, 'Why are you reporting this?'), REASONS.map(r => h('button', { type: 'button', onclick: async () => {
-    const { error } = await sb.rpc('report_item', { p: p.id, c: c ? c.id : null, reason: r });
-    if (error) { UI.alert(error.message, { title: 'Could not submit report' }); return; }
-    // Bridge to localStorage so the moderator page sees the report even if the server list is slow
-    try {
-      if (typeof Mod !== 'undefined' && Mod.report && me) {
-        const src = c || p;
-        const authorLabel = src.anonymous || !src.author
-          ? 'Anonymous'
-          : (src.author_display || src.author);
-        Mod.report({
-          id: p.id,
-          author: authorLabel,
-          title: p.title,
-          board: p.board,
-          cid: c ? c.id : undefined,
-          excerpt: c ? String(c.body || '').slice(0, 80) : undefined
-        }, me.username || me.display || 'student', r);
-      }
-    } catch (_) {}
+  if (anchor.nextElementSibling && anchor.nextElementSibling.classList.contains('rpmenu')) return anchor.nextElementSibling.remove();
+  const err = h('div', { class: 'uierr', role: 'alert' });
+  const opts = REASONS.map(r => h('label', { class: 'rpopt' }, h('input', { type: 'checkbox', value: r }), r));
+  const send = h('button', { type: 'button', class: 'post-btn rpsend', onclick: async () => {
+    const picked = opts.map(l => l.querySelector('input')).filter(i => i.checked).map(i => i.value);
+    if (!picked.length) { err.textContent = 'Choose at least one reason.'; return; }
+    send.disabled = true;
+    for (const reason of picked) {
+      const { error } = await sb.rpc('report_item', { p: p.id, c: c ? c.id : null, reason });
+      if (fail(error)) { send.disabled = false; return; }
+    }
     load();
-  } }, r)));
-  if (anchor.classList.contains('cm')) anchor.appendChild(menu);
-  else anchor.after(menu);
+  } }, 'Send report');
+  const menu = h('div', { class: 'rpmenu', role: 'group', 'aria-label': 'Reasons for reporting' },
+    h('span', { class: 'rptitle' }, 'Why are you reporting this? Choose all that apply.'),
+    h('div', { class: 'rpopts' }, opts), err,
+    h('div', { class: 'rpbtns' }, send, h('button', { type: 'button', class: 'rpcancel', onclick: () => menu.remove() }, 'Cancel')));
+  anchor.after(menu);
+  opts[0].querySelector('input').focus();
 }
 async function sendComment(p, form) {
   const input = form.querySelector('.cm-text'), text = input.value.trim(), img = cImg.get(p.id) || '';
@@ -141,5 +128,5 @@ $('#logoutBtn').addEventListener('click', logout);
   if (p.role === 'moderator') { $('#adminLink').hidden = false; $('#modBtn').hidden = false; }
   if (st && st.warns) document.body.prepend(h('div', { class: 'storewarn' }, 'A moderator has warned you ' + st.warns + (st.warns === 1 ? ' time' : ' times') + '. Please follow the board rules.'));
   await load();
-  setInterval(() => { if (!document.hidden && !$$('#feed input[type=text],#feed .cm-text,#feed textarea').some(i => i.value || i === document.activeElement)) load(); }, 20000);   // pick up other students' posts
+  setInterval(() => { if (!document.hidden && !$$('#feed input[type=text],#feed .cm-text,#feed textarea,#feed .rpmenu').some(i => i.value || i === document.activeElement || i.classList.contains('rpmenu'))) load(); }, 20000);   // pick up other students' posts   // pick up other students' posts
 })();
