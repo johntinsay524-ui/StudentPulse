@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Choose a new password — Student Pulse</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="auth.css">
+</head>
+<body>
+<main class="authwrap">
+  <section class="card authcard" aria-live="polite">
+    <h1>Student Pulse</h1>
+    <p class="sub" id="msg">Checking your reset link…</p>
+    <form id="resetForm" hidden>
+      <label for="pw">New password (8+ characters)</label>
+      <input id="pw" type="password" autocomplete="new-password" required>
+      <label for="pw2">Confirm new password</label>
+      <input id="pw2" type="password" autocomplete="new-password" required>
+      <div class="err" id="err" role="alert"></div>
+      <button class="post-btn" id="saveBtn">Save new password</button>
+    </form>
+    <p class="alt" id="links"><a href="login.html">Back to log in</a></p>
+  </section>
+</main>
+<script src="store.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="supabase-config.js"></script>
+<script src="sb.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+let ready = false;
+const showForm = () => { ready = true; $('msg').textContent = 'Choose a new password for your account.'; $('resetForm').hidden = false; $('pw').focus(); };
+const showBad = () => {
+  $('msg').textContent = 'This reset link cannot be used. It may have expired or already been used.';
+  $('links').innerHTML = '<a href="forgot.html">Send me a new link</a> &middot; <a href="login.html">Back to log in</a>';
+};
+
+// Supabase reads the link and signs the person in temporarily; it announces this with PASSWORD_RECOVERY.
+sb.auth.onAuthStateChange(ev => { if (ev === 'PASSWORD_RECOVERY') showForm(); });
+const bad = /error/i.test(location.hash) || /error/i.test(location.search);
+if (bad) showBad();
+else setTimeout(async () => { if (!ready) { const { data } = await sb.auth.getSession(); data.session ? showForm() : showBad(); } }, 1500);
+
+$('resetForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const a = $('pw').value, b = $('pw2').value, err = $('err'), btn = $('saveBtn');
+  err.textContent = '';
+  if (a.length < 8) { err.textContent = 'Password must be at least 8 characters.'; return; }
+  if (a !== b) { err.textContent = 'Passwords do not match.'; return; }
+  btn.disabled = true;
+  const { error } = await sb.auth.updateUser({ password: a });
+  if (error) { btn.disabled = false; err.textContent = error.message; return; }
+  await sb.auth.signOut();                               // log in again with the new password
+  Store.remove('studentpulse_session');
+  if (history.replaceState) history.replaceState(null, '', location.pathname);
+  $('resetForm').hidden = true;
+  $('msg').textContent = 'Your password has been changed. You can log in with it now.';
+  $('links').innerHTML = '<a class="post-btn" style="display:block;text-align:center;text-decoration:none;padding:10px" href="login.html">Go to log in</a>';
+});
+</script>
+</body>
+</html>

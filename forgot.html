@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Forgot password — Student Pulse</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="auth.css">
+</head>
+<body>
+<main class="authwrap">
+  <form class="card authcard" id="forgotForm">
+    <h1>Student Pulse</h1>
+    <p class="sub">Enter the email you signed up with and we will send you a link to choose a new password.</p>
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" autocomplete="email" required>
+    <div class="err" id="err" role="alert"></div>
+    <div class="notice" id="notice" role="status"></div>
+    <button class="post-btn" id="sendBtn">Send reset link</button>
+    <p class="alt"><a href="login.html">&larr; Back to log in</a></p>
+  </form>
+</main>
+<script src="store.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="supabase-config.js"></script>
+<script src="sb.js"></script>
+<script>
+document.getElementById('forgotForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const email = document.getElementById('email').value.trim().toLowerCase();
+  const err = document.getElementById('err'), notice = document.getElementById('notice'), btn = document.getElementById('sendBtn');
+  err.textContent = ''; notice.textContent = '';
+  if (!/^\S+@\S+\.\S+$/.test(email)) { err.textContent = 'Enter a valid email address.'; return; }
+  btn.disabled = true;
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: new URL('reset.html', location.href).href });
+  btn.disabled = false;
+  if (error) {
+    err.textContent = /rate|seconds|too many/i.test(error.message) ? 'Too many requests. Please wait a few minutes and try again.' : error.message;
+    return;
+  }
+  // The same message is shown whether or not the email has an account, so nobody can use this form to find out who has one.
+  notice.textContent = 'If that email has an account, a reset link is on its way. Check your inbox (and Spam or Junk). The link works for a limited time.';
+  e.target.reset();
+});
+</script>
+</body>
+</html>
