@@ -1,17 +1,17 @@
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Inter:wght@400;500;600;700&display=swap');
-/* Student Pulse palette: Thorn Crown (deep plum), Blood Bargain (wine), Fae Fruit (orange), Opal (violet).
-   Dark mode = deep plum with soft cream text and orange accents.
-   Light mode = cream with plum text and wine accents.
-   (--gold is the "accent" color: orange in dark mode, wine in light mode.)
+/* Student Pulse palette (matches the email-confirmed page): deep forest green, sage, cream and soft lime.
+   Light mode = cream page, sage panels, forest-green accents.
+   Dark mode = deep green with soft cream text and lime accents.
+   (--gold is the "accent" color: forest green in light mode, lime in dark mode.)
    Text colors are picked for strong contrast so they stay readable on a classroom projector. */
-:root{--bg:#2D1036;--sf:#3B1848;--rs:#4A2259;--bd:#6E4A7C;--tx:#F6EDE3;--mu:#D8C3D9;--fa:#C9AECF;--gold:#F2956F;--gs:rgba(242,149,111,.16);--ongold:#2D1036;--grn:#8FD18A;--red:#FF9A8E;--onred:#2D1036;--blue:#9DB8FF;
---maroon:#6B0733;--topgold:#F2956F;--opal:#6850AD;--onopal:#fff;
+:root{--bg:#0F2A20;--sf:#163829;--rs:#1D4634;--bd:#3F6B55;--tx:#EEF3E6;--mu:#C9D8C2;--fa:#AEC4A8;--gold:#B5D69A;--gs:rgba(181,214,154,.16);--ongold:#0F2A20;--grn:#8FD18A;--red:#FF9A8E;--onred:#0F2A20;--blue:#9DB8FF;
+--maroon:#1B4332;--topgold:#D4E3B0;--opal:#2D6A4F;--onopal:#fff;
 --m-happy:#3F9A55;--m-meh:#8A86A8;--m-stressed:#D9902B;--m-upset:#D4493D;
 --serif:'Poppins','Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;--sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;
 box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#FAF4E8;--sf:#FFFBF2;--rs:#F3E8D3;--bd:#CDB48E;--tx:#2D1036;--mu:#4F3558;--fa:#624868;--gold:#6B0733;--gs:rgba(107,7,51,.10);--ongold:#FFF4E6;--grn:#2F6B22;--red:#A8201A;--onred:#fff;--blue:#2F52B8}}
-:root[data-theme="light"]{--bg:#FAF4E8;--sf:#FFFBF2;--rs:#F3E8D3;--bd:#CDB48E;--tx:#2D1036;--mu:#4F3558;--fa:#624868;--gold:#6B0733;--gs:rgba(107,7,51,.10);--ongold:#FFF4E6;--grn:#2F6B22;--red:#A8201A;--onred:#fff;--blue:#2F52B8}
-:root[data-theme="dark"]{--bg:#2D1036;--sf:#3B1848;--rs:#4A2259;--bd:#6E4A7C;--tx:#F6EDE3;--mu:#D8C3D9;--fa:#C9AECF;--gold:#F2956F;--gs:rgba(242,149,111,.16);--ongold:#2D1036;--grn:#8FD18A;--red:#FF9A8E;--onred:#2D1036;--blue:#9DB8FF}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#FAFBF7;--sf:#FDFEFB;--rs:#E8EEDF;--bd:#CBD5C0;--tx:#14342A;--mu:#3F5A4C;--fa:#56705F;--gold:#1B4332;--gs:rgba(27,67,50,.10);--ongold:#F4F8EC;--grn:#2F6B22;--red:#A8201A;--onred:#fff;--blue:#2F52B8}}
+:root[data-theme="light"]{--bg:#FAFBF7;--sf:#FDFEFB;--rs:#E8EEDF;--bd:#CBD5C0;--tx:#14342A;--mu:#3F5A4C;--fa:#56705F;--gold:#1B4332;--gs:rgba(27,67,50,.10);--ongold:#F4F8EC;--grn:#2F6B22;--red:#A8201A;--onred:#fff;--blue:#2F52B8}
+:root[data-theme="dark"]{--bg:#0F2A20;--sf:#163829;--rs:#1D4634;--bd:#3F6B55;--tx:#EEF3E6;--mu:#C9D8C2;--fa:#AEC4A8;--gold:#B5D69A;--gs:rgba(181,214,154,.16);--ongold:#0F2A20;--grn:#8FD18A;--red:#FF9A8E;--onred:#0F2A20;--blue:#9DB8FF}
 *{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
 body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.55 var(--sans)}
 button,input,textarea,select{font:inherit;color:inherit}button{cursor:pointer}
