@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Public+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Inter:wght@400;500;600;700&display=swap');
 /* Student Pulse palette: Thorn Crown (deep plum), Blood Bargain (wine), Fae Fruit (orange), Opal (violet).
    Dark mode = deep plum with soft cream text and orange accents.
    Light mode = cream with plum text and wine accents.
@@ -7,7 +7,7 @@
 :root{--bg:#2D1036;--sf:#3B1848;--rs:#4A2259;--bd:#6E4A7C;--tx:#F6EDE3;--mu:#D8C3D9;--fa:#C9AECF;--gold:#F2956F;--gs:rgba(242,149,111,.16);--ongold:#2D1036;--grn:#8FD18A;--red:#FF9A8E;--onred:#2D1036;--blue:#9DB8FF;
 --maroon:#6B0733;--topgold:#F2956F;--opal:#6850AD;--onopal:#fff;
 --m-happy:#3F9A55;--m-meh:#8A86A8;--m-stressed:#D9902B;--m-upset:#D4493D;
---serif:'Fraunces',Georgia,'Palatino Linotype',serif;--sans:'Public Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;
+--serif:'Poppins','Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;--sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;
 box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 @media (prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#FAF4E8;--sf:#FFFBF2;--rs:#F3E8D3;--bd:#CDB48E;--tx:#2D1036;--mu:#4F3558;--fa:#624868;--gold:#6B0733;--gs:rgba(107,7,51,.10);--ongold:#FFF4E6;--grn:#2F6B22;--red:#A8201A;--onred:#fff;--blue:#2F52B8}}
 :root[data-theme="light"]{--bg:#FAF4E8;--sf:#FFFBF2;--rs:#F3E8D3;--bd:#CDB48E;--tx:#2D1036;--mu:#4F3558;--fa:#624868;--gold:#6B0733;--gs:rgba(107,7,51,.10);--ongold:#FFF4E6;--grn:#2F6B22;--red:#A8201A;--onred:#fff;--blue:#2F52B8}
@@ -212,94 +212,11 @@ body{font-size:16px}
 .boards button.on,.sort button.on,.mood.on,
 .tabs .tab-btn.on,.chartbox .rangebar button.on{background:var(--opal);color:var(--onopal);border-color:var(--opal);font-weight:600}
 
-/* ================= MOBILE ================= */
-:root{padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
-img,video{max-width:100%}
-
-@media(max-width:900px){
-  /* the real cause of sideways scrolling: 1fr can't shrink below its content */
-  .wrap{grid-template-columns:minmax(0,1fr);gap:14px;padding:14px 12px 40px}
-  .side,.rail,main{min-width:0}
-  .side h2{display:none}
-  .boards{gap:6px;padding-bottom:4px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
-  .boards::-webkit-scrollbar{display:none}
-  .boards button{flex:0 0 auto;border:1px solid var(--bd);border-radius:20px;padding:8px 14px;min-height:40px}
-}
-
-@media(max-width:700px){
-  /* top bar: wraps instead of overflowing, and scrolls away to save screen space */
-  .top{flex-wrap:wrap;gap:8px 10px;padding:10px 12px;position:static}
-  .top h1{font-size:18px}
-  .top > span{display:none}
-  .top .sp{flex:1 1 0}
-  .top #who{max-width:55vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .top button{padding:8px 12px;min-height:40px}
-  .top a{padding:10px 0}
-}
-
-@media(max-width:600px){
-  body{font-size:15.5px}
-
-  /* posts */
-  .vote{width:40px}
-  .vote button{min-width:36px;min-height:36px}
-  .pb{padding:10px 12px}
-  .pb h2{font-size:17px;overflow-wrap:anywhere}
-  .pb p{overflow-wrap:anywhere;max-width:none}
-  .meta{line-height:1.8}
-  .acts{flex-wrap:wrap;gap:6px 14px}
-  .acts button,.cm-acts button,.rpmenu button,.sort button{min-height:38px}
-  .cm-acts{flex-wrap:wrap}
-  .cm{overflow-wrap:anywhere}
-  .cimg{max-width:100%}
-  .pimg{max-height:320px}
-  .sort{overflow-x:auto;scrollbar-width:none}
-  .sort button{flex:0 0 auto}
-
-  /* composer */
-  .composer{padding:12px}
-  .composer .crow select{width:100%}
-  .moods{flex:1 1 100%}
-  .mood{min-height:38px;padding:4px 12px}
-  .composer .crow > div[style]{display:none}      /* empty spacer */
-  .composer .post-btn{flex:1 1 100%;padding:11px}
-
-  /* comment box: text on its own row, buttons below it */
-  .cmts form{gap:8px}
-  .cmts .cm-text{flex:1 1 100%;min-width:0}
-  .cmts form button:not(.cm-rm){min-height:40px;padding:6px 16px}
-  .photo-btn{min-height:40px}
-
-  /* pop-ups */
-  .uibox{max-height:calc(100dvh - 40px);overflow:auto;padding:18px}
-  .uibtns{flex-wrap:wrap}
-  .uibtns button{flex:1 1 auto;min-height:42px}
-
-  /* login / sign-up */
-  .authwrap{align-items:flex-start;padding:16px}
-  .authcard{padding:22px 18px}
-  .authcard input,.authcard select{min-height:44px}
-  .authcard .post-btn{min-height:46px}
-}
-@supports(height:100dvh){.authwrap{min-height:100dvh}}
-
-/* multi-select report menu */
-.rpmenu{flex-direction:column;align-items:stretch;gap:8px;padding:12px;margin-top:8px;background:var(--rs);border:1px solid var(--bd);border-radius:8px}
-.rpmenu .rptitle{font-weight:600;color:var(--tx)}
-.rpopts{display:flex;flex-wrap:wrap;gap:8px}
-.rpopt{display:inline-flex;align-items:center;gap:8px;min-height:38px;padding:4px 12px;border:1px solid var(--bd);border-radius:20px;background:var(--sf);color:var(--mu);cursor:pointer;font-size:13.5px}
-.rpopt input{width:18px;height:18px;margin:0;accent-color:var(--gold)}
-.rpopt:has(input:checked){border-color:var(--gold);color:var(--gold);background:var(--gs);font-weight:600}
-.rpopt:has(input:focus-visible){outline:2px solid var(--gold);outline-offset:2px}
-.rpbtns{display:flex;gap:8px;flex-wrap:wrap}
-.rpmenu .rpsend{border-radius:6px;padding:8px 18px;min-height:40px;border:0;color:var(--ongold)}
-.rpmenu .rpsend:hover{border-color:transparent;color:var(--ongold)}
-.rpmenu .rpsend:disabled{opacity:.6}
-.rpmenu .rpcancel{border-radius:6px;min-height:40px;padding:8px 16px}
-.rpmenu .rpcancel:hover{border-color:var(--mu);color:var(--tx)}
-
-.pb > a,.cm > a{display:block;width:fit-content;max-width:100%}
-
-.morebtn{display:block;margin:6px auto 20px;background:none;border:1px solid var(--bd);border-radius:20px;padding:9px 22px;min-height:40px;color:var(--mu)}
-.morebtn:hover:not(:disabled){color:var(--tx);border-color:var(--mu)}
-.morebtn:disabled{opacity:.6}
+/* ---- cleaner typography ---- */
+body{font-size:16px;line-height:1.6;letter-spacing:-.005em}
+h1,h2,h3,.pb h2,.authcard h1,.head h2,.uibox h3{letter-spacing:-.02em;font-weight:700}
+.pb h2{font-size:19px;line-height:1.3}
+.top h1,.brand h1{font-size:20px}
+.pb p{line-height:1.65}
+.meta,.cm .n,.tag,.rb,.rolepill,.pill{font-weight:500}
+.num,.pstats b{font-family:var(--serif);font-weight:600}
