@@ -31,3 +31,13 @@ function wire(formId, action) {
 }
 wire('loginForm',  f => SB.login(f.get('email'), f.get('password')));
 wire('signupForm', f => SB.signup(f.get('username'), f.get('email'), f.get('password'), f.get('confirm'), f.get('role')));
+
+// "Continue as guest" button on the login page
+const guestBtn = document.getElementById('guestBtn');
+if (guestBtn) guestBtn.addEventListener('click', async () => {
+  guestBtn.disabled = true;
+  const res = await SB.guest();
+  guestBtn.disabled = false;
+  if (res.error) document.getElementById('err').textContent = res.error;
+  else go('guest');
+});
