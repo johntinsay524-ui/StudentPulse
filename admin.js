@@ -1,24 +1,11 @@
-// Moderator page. Everything here is read from and written to the Supabase database.
+// Moderator page, reading and writing the Supabase database.
+// Every action below is checked again by the database (must_mod), so hiding this page is only for convenience.
 const $  = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 
-let me = null, warned = false;
-let D = { users: [], reports: [], posts: [], postTotal: 0, logs: [], words: { on: true, list: [] } };
+let me, users = [], reports = [], posts = [], logs = [], words = [], filterOn = true, range = 14, search = '';
 const DEFAULT_WORDS = ['idiot', 'stupid', 'loser', 'dumb', 'shut up', 'kill yourself'];
-
-const TITLES = {
-  overview: ['Overview', 'What students are saying and what needs a decision'],
-  reports:  ['Reports', 'Posts flagged by students, waiting on a decision'],
-  students: ['Students', 'Standing and account actions'],
-  posts:    ['Posts', 'Pin, lock, or remove posts across every board'],
-  filter:   ['Word filter', 'Words and phrases students are not allowed to post']
-};
-$$('.tab-btn').forEach(btn => btn.addEventListener('click', () => {
-  $$('.tab-btn').forEach(b => { b.classList.toggle('on', b === btn); b.setAttribute('aria-selected', String(b === btn)); });
-  $$('.panel').forEach(p => p.classList.toggle('on', p.id === btn.dataset.tab));
-  $('#title').textContent = TITLES[btn.dataset.tab][0];
-  $('#sub').textContent   = TITLES[btn.dataset.tab][1];
-}));
+const ROLE_LIST = ['student', 'teacher', 'staff', 'moderator'];
 
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const ago = t => {
@@ -28,50 +15,37 @@ const ago = t => {
   const h = Math.round(m / 60);
   return h < 24 ? h + 'h ago' : Math.round(h / 24) + 'd ago';
 };
-const MOODS = [['happy', '😊 Happy'], ['meh', '😐 Meh'], ['stressed', '😟 Stressed'], ['upset', '😠 Frustrated']];
 const same = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
-const avHtml = (name, url) => '<span class="av" aria-hidden="true">' + (url ? '<img src="' + esc(url) + '" alt="">' : esc(String(name)[0].toUpperCase())) + '</span>';
-const roleLabel = r => ({ student: 'Student', teacher: 'Teacher', staff: 'Staff', moderator: 'Moderator' }[r] || 'Student');
+const MOODS = [['happy', '😊 Happy'], ['meh', '😐 Meh'], ['stressed', '😟 Stressed'], ['upset', '😠 Frustrated']];
 
-// Run a database call; show a message and return null if it failed.
-async function ok(promise, title = 'Something went wrong') {
-  const { data, error } = await promise;
-  if (error) { await UI.alert(error.message, { title }); return null; }
+// Call a database function. Shows the database's message if it refuses. Returns { data } or null.
+async function call(fn, args) {
+  const { data, error } = await sb.rpc(fn, args);
+  if (error) { await UI.alert(error.message, { title: 'Could not do that' }); return null; }
   return { data };
 }
 
-// ---- Load everything from the database ----
-async function refresh() {
-  const [u, r, p, pc, lg, w, s, pr] = await Promise.all([
-    sb.rpc('mod_users'), sb.rpc('mod_reports'),
-    sb.from('posts_public').select('id,title,board,mood,author,author_display,anonymous,created,pinned,locked,score,comment_count').order('id', { ascending: false }).limit(500),
-    sb.from('posts_public').select('id', { count: 'exact', head: true }),
-    sb.from('mod_log').select('who,text,t').order('id', { ascending: false }).limit(50),
-    sb.from('words').select('word').order('word'),
-    sb.from('settings').select('value').eq('key', 'filter_off').maybeSingle(),
-    sb.from('profiles').select('username,display,avatar')
-  ]);
-  const bad = [u, r, p, lg, w, pr].find(x => x.error);
-  if (bad) { if (!warned) { warned = true; UI.alert(bad.error.message, { title: 'Could not load the moderator data' }); } return; }
-  warned = false;
-  const prof = Object.fromEntries((pr.data || []).map(x => [String(x.username).toLowerCase(), x]));
-  D.users = (u.data || []).map(x => { const q = prof[String(x.name).toLowerCase()] || {}; return { ...x, display: q.display || x.name, avatar: q.avatar || '' }; });
-  D.reports = (r.data || []).map(x => ({ ...x, reporters: x.reporters || [] }));
-  D.posts = (p.data || []).map(x => ({ ...x, t: new Date(x.created).getTime() }));
-  D.postTotal = pc.count != null ? pc.count : D.posts.length;
-  D.logs = lg.data || [];
-  D.words = { on: !(s.data && s.data.value === '1'), list: (w.data || []).map(x => x.word) };
-  render();
-}
+const TITLES = {
+  overview: ['Overview', 'What students are saying and what needs a decision'],
+  reports:  ['Reports', 'Posts flagged by students, waiting on a decision'],
+  students: ['Members', 'Roles, warnings and bans'],
+  posts:    ['Posts', 'Pin, lock, or remove posts across every board'],
+  filter:   ['Word filter', 'Words and phrases students are not allowed to post']
+};
+$$('.tab-btn').forEach(btn => btn.addEventListener('click', () => {
+  $$('.tab-btn').forEach(b => { b.classList.toggle('on', b === btn); b.setAttribute('aria-selected', String(b === btn)); });
+  $$('.panel').forEach(p => p.classList.toggle('on', p.id === btn.dataset.tab));
+  $('#title').textContent = TITLES[btn.dataset.tab][0];
+  $('#sub').textContent = TITLES[btn.dataset.tab][1];
+}));
 
-// ---- Mood over time (stacked bars, one per day) ----
-let range = 14;
+// ---- Mood over time ----
 const MKEYS = ['happy', 'meh', 'stressed', 'upset'];
 const MLABEL = { happy: 'Happy', meh: 'Meh', stressed: 'Stressed', upset: 'Frustrated' };
 const dayKey = t => { const d = new Date(t); return d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate(); };
-function renderChart(posts) {
+function renderChart(list) {
   $$('.rangebar button').forEach(b => { const on = +b.dataset.range === range; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
-  const dated = posts.filter(p => p.t && MKEYS.includes(p.mood));
+  const dated = list.filter(p => p.t && MKEYS.includes(p.mood));
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const days = [];
   for (let i = range - 1; i >= 0; i--) { const d = new Date(today); d.setDate(d.getDate() - i); days.push({ d, c: { happy: 0, meh: 0, stressed: 0, upset: 0 } }); }
@@ -109,26 +83,22 @@ function renderChart(posts) {
 
 // ---- Word filter panel ----
 function renderFilter() {
-  const f = D.words;
-  $('#filterOn').checked = f.on;
-  $('#wordCount').textContent = f.list.length;
-  $('#wordList').innerHTML = f.list.length ? f.list.map(w => `<li class="chip"><span>${esc(w)}</span><button type="button" data-rmword="${esc(w)}" aria-label="Remove ${esc(w)} from the list">×</button></li>`).join('') : '<li class="empty">The list is empty, so nothing is blocked.</li>';
+  $('#filterOn').checked = filterOn;
+  $('#wordCount').textContent = words.length;
+  $('#wordList').innerHTML = words.length
+    ? words.map(w => `<li class="chip"><span>${esc(w)}</span><button type="button" data-rmword="${esc(w)}" aria-label="Remove ${esc(w)} from the list">×</button></li>`).join('')
+    : '<li class="empty">The list is empty, so nothing is blocked.</li>';
 }
-async function saveWords(on, list) {
-  const r = await ok(sb.rpc('set_words', { on_: on, list }), 'Could not save the word list');
-  if (r) D.words = { on, list: [...list].sort() };
-  return !!r;
-}
+const saveWords = async () => { const r = await call('set_words', { on_: filterOn, list: words }); await load(); return !!r; };
 
-// ---- Draw the page ----
+// ---- Draw everything from the loaded data ----
 function render() {
-  const roster = D.users, posts = D.posts, reports = D.reports;
-  const students = roster.filter(u => u.role !== 'moderator');
+  const students = users.filter(u => u.role !== 'moderator');
   const open = reports.filter(r => r.status === 'open');
   const done = reports.filter(r => r.status !== 'open').slice(0, 10);
 
   $('#openCount').textContent = $('#badge').textContent = open.length;
-  $('#postCount').textContent = D.postTotal;
+  $('#postCount').textContent = posts.length;
   $('#stuCount').textContent = students.length;
   $('#banCount').textContent = students.filter(u => u.banned).length;
 
@@ -140,168 +110,205 @@ function render() {
   renderChart(posts);
   renderFilter();
 
-  $('#log').innerHTML = D.logs.length
-    ? D.logs.map(l => `<li><span><b>${esc(l.who || 'a moderator')}</b> ${esc(l.text)}</span><time>${ago(l.t)}</time></li>`).join('')
+  $('#log').innerHTML = logs.length
+    ? logs.map(l => `<li><span><b>${esc(l.who || '')}</b> ${esc(l.text)}</span><time>${ago(l.t)}</time></li>`).join('')
     : '<li><span>No moderation activity yet.</span></li>';
 
   // Reports
   const reportRow = (r, isDone) => {
     const who = r.author, what = r.commentId ? 'comment' : 'post';
     const stu = students.find(u => same(u.name, who));
-    const n = r.reporters.length;
+    const reporters = r.reporters || [], n = reporters.length;
     let btns = '<button class="ok" data-act="dismiss">Dismiss</button><button class="dng" data-act="remove">Remove ' + what + '</button>';
     if (stu && !stu.banned) btns += '<button class="dng" data-act="warn">Warn student</button><button class="dng" data-act="ban">Ban student</button>';
     if (r.canReveal) btns += '<button class="dng" data-act="reveal">Reveal author</button>';
-    const note = isDone ? `<div class="result">✓ ${esc(r.outcome || 'Resolved')}</div>`
+    const note = isDone ? `<div class="result">✓ ${esc(r.outcome || '')}</div>`
       : r.revealed ? '<div class="result">Author revealed: <b>' + esc(r.author) + '</b> (logged)</div>'
       : who === 'Anonymous' ? '<div class="result">Anonymous ' + what + ': the author is hidden. It can be revealed only if reported for bullying, harassment or a threat.</div>' : '';
-    return `<li class="rrow${isDone ? ' done' : ''}" data-id="${esc(r.id)}">
+    return `<li class="rrow${isDone ? ' done' : ''}" data-id="${r.id}">
       <div class="rbody">${r.reasons.map(x => `<span class="reason">${esc(x)}</span>`).join(' ')}
         <div class="snip">${r.commentId ? 'Comment on “' + esc(r.title) + '”' : esc(r.title)} — in ${esc(r.board)}</div>${r.commentId ? '<div class="meta">“' + esc(r.excerpt || '(photo only)') + '”</div>' : ''}
-        <div class="meta">posted by <b>${esc(who)}</b>${r.revealed ? ' (revealed)' : ''} · reported by <b>${n === 1 ? esc(r.reporters[0]) : n + ' students'}</b> · ${ago(r.created)}</div>${note}</div>
+        <div class="meta">posted by <b>${esc(who)}</b>${r.revealed ? ' (revealed)' : ''} · reported by <b>${n === 1 ? esc(reporters[0]) : n + ' students'}</b> · ${ago(r.created)}</div>${note}</div>
       <div class="ra">${btns}</div></li>`;
   };
   $('#reportList').innerHTML = open.length ? open.map(r => reportRow(r, false)).join('') : '<li class="empty">No open reports. Nothing needs a decision right now.</li>';
   $('#doneTitle').hidden = $('#doneList').hidden = !done.length;
   $('#doneList').innerHTML = done.map(r => reportRow(r, true)).join('');
 
-  // Students: profile picture, display name and @username come from the database
-  $('#studentBody').innerHTML = roster.map(u => {
-    const isMod = u.role === 'moderator';
+  // Members
+  const shownUsers = users.filter(u => !search || u.name.toLowerCase().includes(search.toLowerCase()));
+  $('#studentBody').innerHTML = shownUsers.length ? shownUsers.map(u => {
+    const isMe = same(u.name, me.username), isMod = u.role === 'moderator';
     const when = t => new Date(t).toLocaleDateString([], { month: 'short', day: 'numeric' });
     const why = u.banned ? `<small class="why">${u.banReason ? '“' + esc(u.banReason) + '”' : 'No reason recorded'} · ${esc(u.bannedBy || 'a moderator')}${u.bannedAt ? ', ' + when(u.bannedAt) : ''}</small>` : '';
     const status = u.banned ? 'Banned' : u.warns ? u.warns + (u.warns === 1 ? ' warning' : ' warnings') : 'Good standing';
     const cls = u.banned ? 'banned' : u.warns ? 'warned' : '';
-    const acts = isMod ? '' : '<button data-uact="hist">History</button>' + (u.warns ? '<button data-uact="unwarn">Remove warning</button>' : '') + (u.banned ? '<button data-uact="unban">Unban</button>'
-      : '<button data-uact="warn">Warn</button><button class="dng" data-uact="ban">Ban</button>');
-    const nm = esc(u.display) + (u.display !== u.name ? ' <small class="hint">@' + esc(u.name) + '</small>' : '');
-    return `<tr data-user="${esc(u.name)}" class="${cls}"><td class="un">${avHtml(u.name, u.avatar)}<span class="nm">${nm}</span></td>
-      <td>${isMod ? '<span class="pill r-moderator">Moderator</span>' : '<select class="rolesel" data-urole aria-label="Role for ' + esc(u.name) + '">' + ['student', 'teacher', 'staff'].map(r => '<option value="' + r + '"' + (u.role === r ? ' selected' : '') + '>' + roleLabel(r) + '</option>').join('') + '</select>'}</td>
+    const roleCell = isMe ? '<span class="pill r-moderator">Moderator (you)</span>'
+      : '<select class="rolesel" data-urole aria-label="Role for ' + esc(u.name) + '">' + ROLE_LIST.map(r => '<option value="' + r + '"' + (u.role === r ? ' selected' : '') + '>' + Auth.roleLabel(r) + '</option>').join('') + '</select>';
+    const acts = isMe ? '' : '<button data-uact="hist">History</button>' + (isMod ? ''
+      : (u.warns ? '<button data-uact="unwarn">Remove warning</button>' : '') + (u.banned ? '<button data-uact="unban">Unban</button>' : '<button data-uact="warn">Warn</button><button class="dng" data-uact="ban">Ban</button>'));
+    return `<tr data-user="${esc(u.name)}" class="${cls}"><td class="un"><span class="nm">${esc(u.name)}</span></td><td>${roleCell}</td>
       <td>${u.joined ? new Date(u.joined).toLocaleDateString([], { month: 'short', year: 'numeric' }) : '—'}</td>
       <td>${u.posts}</td><td class="st">${status}${why}</td><td class="tact">${acts}</td></tr>`;
-  }).join('');
+  }).join('') : '<tr><td colspan="6" class="empty">No one matches that search.</td></tr>';
 
   // Posts
-  $('#postList').innerHTML = posts.length ? posts.map(p => `<li class="rrow prow" data-id="${esc(p.id)}">
-      <div class="rbody"><div class="snip">${esc(p.title || '')}</div>
-        <div class="meta">${esc(p.board)} · <b>${p.anonymous ? 'Anonymous' : esc(p.author_display || p.author || 'Deleted user')}</b> · ${p.comment_count} comments · ${p.score} points</div>
+  $('#postList').innerHTML = posts.length ? posts.map(p => `<li class="rrow prow" data-id="${p.id}">
+      <div class="rbody"><div class="snip">${esc(p.title)}</div>
+        <div class="meta">${esc(p.board)} · <b>${esc(p.author || 'Anonymous')}</b> · ${p.comments} comments · ${p.score} points</div>
         <div class="flags">${p.pinned ? '<span class="fl pinned">Pinned</span>' : ''}${p.locked ? '<span class="fl locked">Locked</span>' : ''}</div></div>
-      <div class="ra"><button data-pact="pin">${p.pinned ? 'Unpin' : 'Pin'}</button><button data-pact="lock">${p.locked ? 'Unlock' : 'Lock'}</button><button class="dng" data-pact="del">Delete</button></div>
+      <div class="ra"><button data-pact="pinned">${p.pinned ? 'Unpin' : 'Pin'}</button><button data-pact="locked">${p.locked ? 'Unlock' : 'Lock'}</button><button class="dng" data-pact="del">Delete</button></div>
     </li>`).join('') : '<li class="empty">No posts on the board yet.</li>';
 }
 
+async function load() {
+  const res = await Promise.all([
+    sb.rpc('mod_users'), sb.rpc('mod_reports'),
+    sb.from('posts_public').select('*').order('id', { ascending: false }),
+    sb.from('comments_public').select('id,post_id'),
+    sb.from('mod_log').select('who,text,t').order('id', { ascending: false }).limit(50),
+    sb.from('words').select('word').order('word'),
+    sb.from('settings').select('value').eq('key', 'filter_off')
+  ]);
+  const bad = res.find(r => r.error);
+  if (bad) return UI.alert(bad.error.message, { title: 'Could not load the moderator page' });
+  const [u, r, p, c, l, w, s] = res;
+  const cc = {}; (c.data || []).forEach(x => cc[x.post_id] = (cc[x.post_id] || 0) + 1);
+  users = u.data || []; reports = r.data || [];
+  posts = (p.data || []).map(x => ({ ...x, t: Date.parse(x.created), comments: cc[x.id] || 0 }));
+  logs = l.data || []; words = (w.data || []).map(x => x.word); filterOn = !(s.data || []).some(x => x.value === '1');
+  render();
+}
+
+// ---- Clicks ----
 document.addEventListener('click', async e => {
   const b = e.target.closest('button');
   if (!b) return;
 
   if (b.dataset.range) { range = +b.dataset.range; render(); return; }
-  if (b.dataset.rmword) { if (await saveWords(D.words.on, D.words.list.filter(w => w !== b.dataset.rmword))) render(); return; }
+  if (b.dataset.rmword) { words = words.filter(w => w !== b.dataset.rmword); await saveWords(); return; }
   if (b.id === 'wordReset') {
-    if (await UI.confirm('Replace the list with the default words? Any words you added will be removed.', { title: 'Restore the default list', ok: 'Restore', danger: true })) await saveWords(D.words.on, DEFAULT_WORDS);
-    render(); return;
+    if (await UI.confirm('Replace the list with the default words? Any words you added will be removed.', { title: 'Restore the default list', ok: 'Restore', danger: true })) { words = DEFAULT_WORDS.slice(); filterOn = true; await saveWords(); }
+    return;
   }
   if (b.id === 'resetBtn') {
-    if (await UI.confirm('Delete all posts, reports and the activity log? Accounts (and their warnings and bans) are kept.', { title: 'Reset demo data', ok: 'Delete everything', danger: true })) {
-      if (await ok(sb.rpc('mod_reset'), 'Could not reset')) await refresh();
-    }
+    if (await UI.confirm('Delete all posts, reports and the activity log? Accounts (and their warnings and bans) are kept.', { title: 'Reset demo data', ok: 'Delete everything', danger: true })) { await call('mod_reset'); await load(); }
     return;
   }
 
   // Reports
   if (b.dataset.act) {
-    const r = D.reports.find(x => String(x.id) === b.closest('.rrow').dataset.id);
+    const r = reports.find(x => String(x.id) === b.closest('.rrow').dataset.id);
     if (!r) return;
-    const act = b.dataset.act, what = r.commentId ? 'comment' : 'post', who = r.author;
+    const act = b.dataset.act, who = r.author;
     if (act === 'reveal') {
-      if (!await UI.confirm('Reveal who wrote this anonymous ' + what + '? This is recorded in the activity log.', { title: 'Reveal author', ok: 'Reveal', danger: true })) return;
-      await ok(sb.rpc('mod_reveal', { rid: r.id }), 'Cannot reveal');
-      await refresh(); return;
+      if (!await UI.confirm('Reveal who wrote this anonymous ' + (r.commentId ? 'comment' : 'post') + '? This is recorded in the activity log.', { title: 'Reveal author', ok: 'Reveal', danger: true })) return;
+      await call('mod_reveal', { rid: r.id }); await load(); return;
     }
-    if (act === 'warn' || act === 'ban') {
-      const reason = await UI.prompt(act === 'ban' ? 'Moderators can see this reason later. The student is not shown it.' : 'The student sees this reason with their warning.',
+    if (act === 'dismiss') await call('mod_resolve', { rid: r.id, outcome: 'Dismissed' });
+    else if (act === 'remove') await call(r.commentId ? 'mod_delete_comment' : 'mod_delete_post', r.commentId ? { cid: r.commentId } : { pid: r.postId });
+    else {
+      const reason = await UI.prompt(act === 'ban' ? 'Moderators can see this reason later. The student is not shown it.' : 'Optional. Moderators can see this in the history.',
         { title: (act === 'ban' ? 'Ban ' : 'Warn ') + who, label: act === 'ban' ? 'Reason for the ban' : 'Reason for the warning',
           value: `Reported for ${r.reasons.join(', ')}: ${r.commentId ? 'comment on ' : ''}"${r.title}"`, required: act === 'ban', ok: act === 'ban' ? 'Ban student' : 'Warn student', danger: act === 'ban' });
       if (reason === null) return;
-      if (!await ok(sb.rpc('mod_action', { uname: who, act, note: reason }), act === 'ban' ? 'Could not ban' : 'Could not warn')) return;
+      if (await call('mod_action', { uname: who, act, note: reason })) await call('mod_resolve', { rid: r.id, outcome: act === 'ban' ? 'Student banned' : 'Student warned' });
     }
-    const outcome = { dismiss: 'Dismissed', remove: r.commentId ? 'Comment removed' : 'Post removed', warn: 'Student warned', ban: 'Student banned' }[act];
-    if (!await ok(sb.rpc('mod_resolve', { rid: r.id, outcome }), 'Could not close the report')) return;
-    if (act === 'remove') await ok(r.commentId ? sb.rpc('mod_delete_comment', { cid: r.commentId }) : sb.rpc('mod_delete_post', { pid: r.postId }), 'Could not remove it');
-    await refresh(); return;
+    await load(); return;
   }
 
-  // Students table
+  // Members table
   if (b.dataset.uact) {
     const user = b.closest('tr').dataset.user, act = b.dataset.uact;
-    const VERB = { warn: 'warned', unwarn: 'removed one warning from', ban: 'banned', unban: 'unbanned', role: 'changed the role of' };
     if (act === 'hist') {
-      const rec = D.users.find(u => same(u.name, user));
+      const rec = users.find(u => same(u.name, user));
       const h = ((rec && rec.history) || []).slice().reverse();
-      await UI.alert(h.length ? '' : 'No warnings or bans yet.', { title: user + ': moderation history',
-        list: h.length ? h.map(x => `${new Date(x.t).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })} · ${x.by} ${VERB[x.act] || x.act} ${user}${x.reason ? ' — ' + x.reason : ''}`) : undefined });
+      const VERB = { warn: 'warned', unwarn: 'removed one warning from', ban: 'banned', unban: 'unbanned' };
+      const line = x => `${new Date(x.t).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })} · ` +
+        (x.act === 'role' ? `${x.by} set the role of ${user} to ${Auth.roleLabel(x.reason)}` : `${x.by} ${VERB[x.act] || x.act} ${user}${x.reason ? ' — ' + x.reason : ''}`);
+      await UI.alert(h.length ? '' : 'No warnings, bans or role changes yet.', { title: user + ': history', list: h.length ? h.map(line) : undefined });
       return;
     }
     let reason = '';
     if (act === 'ban' || act === 'warn') {
-      reason = await UI.prompt(act === 'ban' ? 'Moderators can see this reason later. The student is not shown it.' : 'The student sees this reason with their warning.',
+      reason = await UI.prompt(act === 'ban' ? 'Moderators can see this reason later. The student is not shown it.' : 'Optional. Moderators can see this in the history.',
         { title: (act === 'ban' ? 'Ban ' : 'Warn ') + user, label: act === 'ban' ? 'Reason for the ban' : 'Reason for the warning', placeholder: 'e.g. repeated bullying in Campus life', required: act === 'ban', ok: act === 'ban' ? 'Ban student' : 'Warn student', danger: act === 'ban' });
       if (reason === null) return;
     }
-    await ok(sb.rpc('mod_action', { uname: user, act, note: reason }), 'Could not ' + act);
-    await refresh(); return;
+    await call('mod_action', { uname: user, act, note: reason });
+    await load(); return;
   }
 
   // Posts
   if (b.dataset.pact) {
-    const id = Number(b.closest('.rrow').dataset.id), act = b.dataset.pact;
-    const post = D.posts.find(p => p.id === id);
+    const id = +b.closest('.rrow').dataset.id, act = b.dataset.pact, post = posts.find(p => p.id === id);
     if (post) {
       if (act === 'del') {
-        if (!await UI.confirm(`Delete "${post.title || 'this post'}"? This also deletes its comments and photos.`, { title: 'Delete post', ok: 'Delete', danger: true })) return;
-        await ok(sb.rpc('mod_delete_post', { pid: id }), 'Could not delete');
-      } else await ok(sb.rpc('mod_flag', { pid: id, k: act === 'pin' ? 'pinned' : 'locked' }), 'Could not change the post');
+        if (!await UI.confirm(`Delete "${post.title}"? This also deletes its comments and photos.`, { title: 'Delete post', ok: 'Delete', danger: true })) return;
+        await call('mod_delete_post', { pid: id });
+      } else await call('mod_flag', { pid: id, k: act });
     }
-    await refresh();
+    await load();
   }
 });
 
-// Change a member's role
+// Change a member's role. Making someone a moderator (or removing it) always asks first.
 document.addEventListener('change', async e => {
   const s = e.target.closest && e.target.closest('[data-urole]'); if (!s) return;
-  const user = s.closest('tr').dataset.user;
-  await ok(sb.rpc('mod_action', { uname: user, act: 'role', note: 'to ' + roleLabel(s.value), new_role: s.value }), 'Could not change the role');
-  await refresh();
+  const user = s.closest('tr').dataset.user, rec = users.find(u => same(u.name, user)), to = s.value;
+  if (!rec || rec.role === to) return;
+  let ok = true;
+  if (to === 'moderator') ok = await UI.confirm('Moderators can warn and ban members, see every report, delete posts, edit the word filter, and reveal anonymous authors in serious reports. They can also change other members’ roles.',
+    { title: 'Make ' + user + ' a moderator?', ok: 'Make moderator', danger: true });
+  else if (rec.role === 'moderator') ok = await UI.confirm(user + ' will lose all moderator tools and become ' + Auth.roleLabel(to).toLowerCase() + '.', { title: 'Remove moderator rights?', ok: 'Remove', danger: true });
+  if (ok) await call('set_role', { uname: user, new_role: to });
+  await load();   // also puts the dropdown back if it was cancelled or refused
 });
 
-// Word filter: add a word, switch on/off, test a sentence
+$('#stuSearch').addEventListener('input', e => { search = e.target.value.trim(); render(); });
+
+// Word filter: add a word, switch on/off, test a sentence (the test uses the real database filter)
 $('#wordForm').addEventListener('submit', async e => {
   e.preventDefault();
-  const word = e.target.elements.word.value.trim().toLowerCase().replace(/\s+/g, ' '), err = $('#wordErr');
-  err.textContent = '';
-  if (word.length < 2) { err.textContent = 'Type a word or phrase (at least 2 characters).'; return; }
-  if (word.length > 40) { err.textContent = 'Keep it under 40 characters.'; return; }
-  if (D.words.list.some(w => w.toLowerCase() === word)) { err.textContent = 'That word is already on the list.'; return; }
-  if (D.words.list.length >= 200) { err.textContent = 'The list is full (200 words).'; return; }
-  if (await saveWords(D.words.on, [...D.words.list, word])) { e.target.reset(); render(); }
+  const err = $('#wordErr'); err.textContent = '';
+  const w = e.target.elements.word.value.trim().toLowerCase().replace(/\s+/g, ' ');
+  if (w.length < 2 || w.length > 40) { err.textContent = 'Type a word or phrase (2–40 characters).'; return; }
+  if (words.includes(w)) { err.textContent = 'That word is already on the list.'; return; }
+  if (words.length >= 200) { err.textContent = 'The list is full (200 words).'; return; }
+  words = [...words, w];
+  if (await saveWords()) e.target.reset();
 });
-$('#filterOn').addEventListener('change', async e => { if (!await saveWords(e.target.checked, D.words.list)) e.target.checked = D.words.on; render(); });
+$('#filterOn').addEventListener('change', async e => {
+  filterOn = e.target.checked;
+  if (!filterOn && !await UI.confirm('Students will be able to post any words until you turn it back on.', { title: 'Turn the word filter off?', ok: 'Turn off', danger: true })) { filterOn = true; render(); return; }
+  await saveWords();
+});
+let testTimer;
 $('#wordTest').addEventListener('input', e => {
-  const t = e.target.value.trim(), hit = t && StudentPulseWordFilter.findBlockedWord(t, D.words.list);
-  $('#wordTestOut').textContent = !t ? '' : !D.words.on ? 'The filter is off, so this would be allowed.' : hit ? `Blocked: it contains “${hit}”.` : 'Allowed.';
-  $('#wordTestOut').className = 'testout ' + (hit ? 'bad' : 'ok');
+  clearTimeout(testTimer);
+  const t = e.target.value.trim(), out = $('#wordTestOut');
+  if (!t) { out.textContent = ''; return; }
+  testTimer = setTimeout(async () => {
+    const { data, error } = await sb.rpc('test_words', { t });
+    if (error) { out.textContent = error.message; out.className = 'testout bad'; return; }
+    const hit = filterOn && data;
+    out.textContent = !filterOn ? 'The filter is off, so this would be allowed.' : data ? `Blocked: it matches “${data}”.` : 'Allowed.';
+    out.className = 'testout ' + (hit ? 'bad' : 'ok');
+  }, 300);
 });
 
 $('#logoutBtn').addEventListener('click', async () => { await sb.auth.signOut(); Auth.logout(); });
 
-// ---- Start: only moderators may be here ----
+// Start: only a real moderator (checked in the database) may stay on this page
 (async () => {
   const { data: { session } } = await sb.auth.getSession();
-  if (!session) return Auth.logout();
-  const { data: p } = await sb.from('profiles').select('*').eq('id', session.user.id).single();
+  if (!session) return location.replace('login.html');
+  const { data: p } = await sb.from('profiles').select('username,role').eq('id', session.user.id).single();
   if (!p || p.role !== 'moderator') return location.replace('index.html');
   me = p;
-  $('#meName').textContent = p.display || p.username;
-  $('#meDot').innerHTML = avHtml(p.username, p.avatar);
-  await refresh();
-  setInterval(() => { if (!document.hidden) refresh(); }, 30000);   // pick up new reports and posts
+  $('#meName').textContent = p.username;
+  $('#meDot').replaceChildren(Auth.avatar(p.username));
+  document.documentElement.style.visibility = '';
+  await load();
+  setInterval(() => { if (!document.hidden && !document.querySelector('.uimodal') && !(document.activeElement && /INPUT|SELECT/.test(document.activeElement.tagName))) load(); }, 30000);
 })();

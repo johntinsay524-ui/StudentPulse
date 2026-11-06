@@ -7,10 +7,9 @@
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="admin.css">
 <script src="store.js"></script>
-<script src="word-filter.js"></script>
 <script src="dialog.js"></script>
 <script src="auth.js"></script>
-<script>Auth.requireMod();</script>
+<script>Auth.requireMod(); document.documentElement.style.visibility = 'hidden';</script>
 </head>
 <body class="admin">
 <a class="skip" href="#main">Skip to the content</a>
@@ -21,7 +20,7 @@
     <div class="tabs" role="tablist" aria-label="Moderator sections">
       <button class="tab-btn on" role="tab" id="tab-overview" aria-controls="overview" aria-selected="true" data-tab="overview">Overview</button>
       <button class="tab-btn" role="tab" id="tab-reports" aria-controls="reports" aria-selected="false" data-tab="reports">Reports <span class="badge" id="badge" aria-label="open reports">0</span></button>
-      <button class="tab-btn" role="tab" id="tab-students" aria-controls="students" aria-selected="false" data-tab="students">Students</button>
+      <button class="tab-btn" role="tab" id="tab-students" aria-controls="students" aria-selected="false" data-tab="students">Members</button>
       <button class="tab-btn" role="tab" id="tab-posts" aria-controls="posts" aria-selected="false" data-tab="posts">Posts</button>
       <button class="tab-btn" role="tab" id="tab-filter" aria-controls="filter" aria-selected="false" data-tab="filter">Word filter</button>
     </div>
@@ -72,12 +71,15 @@
       <ul class="rows" id="doneList"></ul>
     </section>
 
-    <!-- STUDENTS -->
+    <!-- MEMBERS -->
     <section class="panel" id="students" role="tabpanel" aria-labelledby="tab-students">
-      <h3 class="sec">Students</h3>
-      <p class="hint" style="margin:0 0 12px">Everyone who signs up appears here with their profile picture, display name and username.</p>
+      <h3 class="sec">Members and roles</h3>
+      <p class="hint" style="margin:0 0 12px">People create their own accounts on the sign-up page. To make someone a moderator, find them below and change their role to <b>Moderator</b>. You can change it back the same way. You cannot change your own role.</p>
+      <div class="card newacct">
+        <input id="stuSearch" type="search" aria-label="Search members by username" placeholder="Search by username" autocomplete="off">
+      </div>
       <table class="tbl">
-        <thead><tr><th scope="col">Student</th><th scope="col">Role</th><th scope="col">Joined</th><th scope="col">Posts</th><th scope="col">Status</th><th scope="col"><span class="vh">Actions</span></th></tr></thead>
+        <thead><tr><th scope="col">Member</th><th scope="col">Role</th><th scope="col">Joined</th><th scope="col">Posts</th><th scope="col">Status</th><th scope="col"><span class="vh">Actions</span></th></tr></thead>
         <tbody id="studentBody"></tbody>
       </table>
     </section>
@@ -85,7 +87,7 @@
     <!-- WORD FILTER -->
     <section class="panel" id="filter" role="tabpanel" aria-labelledby="tab-filter">
       <h3 class="sec">Banned words and phrases</h3>
-      <p class="hint" style="margin:0 0 12px">Students cannot post, comment or save a profile that contains a word on this list (whole words only, capital letters are ignored). Moderators are exempt. Add teacher names here to enforce the "no names in complaints" rule.</p>
+      <p class="hint" style="margin:0 0 12px">Posts, comments, profiles and usernames that contain a word on this list are rejected by the database itself, so it cannot be skipped from the browser. It also catches capital letters, accents, look-alike letters, leetspeak (1d10t), repeated letters, symbols between letters (i.d.i.o.t) and spaced-out letters (i d i o t). Whole words only, so “closer” is fine when “loser” is listed. Moderators are exempt. Add teacher names here to enforce the "no names in complaints" rule.</p>
       <label class="onoff"><input type="checkbox" id="filterOn"> Filter is on</label>
       <form class="card newacct" id="wordForm">
         <input name="word" aria-label="Word or phrase to block" placeholder="Word or phrase to block" maxlength="40" autocomplete="off" required>
