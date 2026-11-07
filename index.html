@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Student Pulse — Student Board</title>
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="stylesheet" href="style.css">
 <script src="store.js"></script>
 <script src="dialog.js"></script>
@@ -14,7 +17,7 @@
 <a class="skip" href="#main">Skip to the posts</a>
 
 <header class="top">
-  <h1>Student Pulse</h1>
+  <h1><img src="logo.png" alt="" width="28" height="28" style="vertical-align:-6px;margin-right:8px">Student Pulse</h1>
   <span style="color:var(--fa);font-size:12.5px">student board</span>
   <div class="sp"></div>
   <a href="profile.html" id="who" title="My profile" style="font-size:13px;text-decoration:none"></a>
@@ -106,35 +109,11 @@
 
 <p class="foot"><a href="about.html">About, privacy &amp; terms</a><button type="button" id="welcomeBtn">Show the welcome guide</button></p>
 
-<!-- Templates used by script.js when someone makes a new post or comment -->
-<template id="post-tpl">
-  <article class="card post" data-id="" data-board="" data-mood="">
-    <div class="pb">
-      <div class="meta"><span class="b"></span> · <span class="n"></span> · just now<span class="tag"></span></div>
-      <h2></h2>
-      <p></p>
-      <div class="acts">
-        <button data-a="cm">💬 <span class="cm-count">0</span> comments</button>
-        <button data-a="rp">Report</button>
-        <button class="dng remove" data-a="rm">Remove</button>
-      </div>
-      <div class="cmts" hidden>
-        <div class="cm-list"></div>
-        <form class="cm-form"><input class="cm-text" aria-label="Add a comment" placeholder="Add a comment"><label class="photo-btn" title="Add a photo">📷<input type="file" class="cm-file vh" accept="image/*" aria-label="Add a photo to your comment"></label><label class="anon cm-anon" title="Other students will not see your name"><input type="checkbox" class="cm-an"> Anonymous</label><button>Reply</button><div class="cm-prev" hidden><img alt="Preview of the photo you are adding"><button type="button" class="cm-rm">Remove photo</button></div></form>
-      </div>
-    </div>
-  </article>
-</template>
-
-<template id="cm-tpl">
-  <div class="cm"><span class="n"></span><br><span class="txt"></span></div>
-</template>
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="supabase-config.js"></script>
 <script src="sb.js"></script>
 <script src="images.js"></script>
-<script src="board.js?v=3"></script>
+<script src="board.js"></script>
 <script src="welcome.js"></script>
 <script src="extras.js"></script>
 </body>
